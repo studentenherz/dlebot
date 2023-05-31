@@ -1,6 +1,6 @@
 use teloxide::{
     prelude::*,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, Me},
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me},
     utils::command::BotCommands,
 };
 
@@ -22,18 +22,34 @@ enum Command {
 }
 
 pub async fn handle_messages(bot: Bot, msg: Message, me: Me) -> ResponseResult<()> {
+    let keyboard = KeyboardMarkup::new([
+        [
+            KeyboardButton::new("🎲 Palabra aleatoria"),
+            KeyboardButton::new("📖 Palabra del día"),
+        ],
+        [
+            KeyboardButton::new("🔔 Suscripción"),
+            KeyboardButton::new("❔ Ayuda"),
+        ],
+    ])
+    .resize_keyboard(true);
+
     if let Some(text) = msg.text() {
         match BotCommands::parse(text, me.username()) {
             Ok(Command::Start) => {
                 bot.parse_mode(teloxide::types::ParseMode::Html)
                     .send_message(msg.chat.id, include_str!("templates/start.txt"))
                     .disable_web_page_preview(true)
+                    .reply_markup(keyboard)
                     .await?
             }
+
             Ok(Command::Help | Command::Ayuda) => {
-                let keyboard = InlineKeyboardMarkup::new(vec![vec![
-                    InlineKeyboardButton::switch_inline_query("Buscar definición", ""),
-                ]]);
+                let inline_keyboard =
+                    InlineKeyboardMarkup::new([[InlineKeyboardButton::switch_inline_query(
+                        "Buscar definición",
+                        "",
+                    )]]);
 
                 bot.parse_mode(teloxide::types::ParseMode::Html)
                     .send_message(
@@ -43,13 +59,15 @@ pub async fn handle_messages(bot: Bot, msg: Message, me: Me) -> ResponseResult<(
                             bot_username = me.username()
                         ),
                     )
-                    .reply_markup(keyboard)
+                    .reply_markup(inline_keyboard)
                     .await?
             }
+
             Ok(_) => {
                 bot.send_message(msg.chat.id, "Not implemented command")
                     .await?
             }
+
             Err(_) => bot.send_message(msg.chat.id, "Just text").await?,
         };
     }
