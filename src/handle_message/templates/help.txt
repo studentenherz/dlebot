@@ -1,0 +1,5 @@
+Simplemente, envía un mensaje de texto donde solo esté la palabra que deseas buscar, respetando su correcta escritura incluyendo tildes.
+
+Si quieres acceder rápidamente a una definición desde cualquier otro chat, escribe @{bot_username}  y luego la palabra que deseas buscar, en unos segundos aparecerán las opciones compatibles. En <a href="https://t.me/dleraebotchannel/32">esta publicación</a> se muestra cómo.
+
+En las definiciones se pueden encontrar algunas abreviaturas cuyo significado puedes ver <a href="https://t.me/dleraebotchannel/10">aquí</a>.

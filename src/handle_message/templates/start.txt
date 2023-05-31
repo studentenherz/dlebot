@@ -1,0 +1,7 @@
+No es necesario que inicies un chat con el bot para que funcione, tampoco es necesario que lo agregues a ningún grupo o canal (/ayuda para más información), pero ya que estás aquí te cuento algunas cosas:
+
+ - los comandos están en español porque es un bot para obtener definiciones de palabras en español 😅.
+
+ - Hace un tiempo le escribí a la RAE (a través de un formulario en su página web, quizá nunca me leyeron) proponiéndoles la idea de que hicieran este bot, si quisieran problablemente Telegram les diese un @ más corto como @dle y la marca de bot oficial.
+
+Puedes ver el código del bot en <a href="https://github.com/studentenherz/dlebot">GitHub</a>, y puedes recibir noticias acerca del bot en @dleraebotchannel.
