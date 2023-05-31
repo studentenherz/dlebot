@@ -6,7 +6,7 @@
         -   [x] `/start`
         -   [x] `/help`
             -   [x] Add inline button for `/help`
-    -   [ ] Add keyboard buttons
+    -   [x] Add keyboard buttons
     -   [ ] Database
         -   [ ] Connect to database
         -   [ ] Models
