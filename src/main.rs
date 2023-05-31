@@ -1,11 +1,10 @@
+mod handle_inline;
 mod handle_message;
 
 use dotenvy::dotenv;
-use handle_message::handle_messages;
-use teloxide::{
-    prelude::*,
-    types::{InlineQueryResult, InlineQueryResultArticle},
-};
+use handle_inline::handle_inline;
+use handle_message::handle_message;
+use teloxide::prelude::*;
 
 #[tokio::main]
 async fn main() {
@@ -17,7 +16,7 @@ async fn main() {
     let bot = Bot::from_env();
 
     let handler = dptree::entry()
-        .branch(Update::filter_message().endpoint(handle_messages))
+        .branch(Update::filter_message().endpoint(handle_message))
         .branch(Update::filter_inline_query().endpoint(handle_inline));
 
     Dispatcher::builder(bot, handler)
@@ -25,22 +24,4 @@ async fn main() {
         .build()
         .dispatch()
         .await;
-}
-
-async fn handle_inline(bot: Bot, q: InlineQuery) -> ResponseResult<()> {
-    let mut results: Vec<InlineQueryResult> = vec![];
-
-    for i in 1..10 {
-        results.push(InlineQueryResult::Article(InlineQueryResultArticle::new(
-            i.to_string(),
-            i.to_string(),
-            teloxide::types::InputMessageContent::Text(
-                teloxide::types::InputMessageContentText::new(i.to_string()),
-            ),
-        )));
-    }
-
-    bot.answer_inline_query(q.id, results).await?;
-
-    Ok(())
 }

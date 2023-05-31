@@ -21,7 +21,7 @@ enum Command {
     Suscripcion,
 }
 
-pub async fn handle_messages(bot: Bot, msg: Message, me: Me) -> ResponseResult<()> {
+pub async fn handle_message(bot: Bot, msg: Message, me: Me) -> ResponseResult<()> {
     let keyboard = KeyboardMarkup::new([
         [
             KeyboardButton::new("🎲 Palabra aleatoria"),
