@@ -1,4 +1,8 @@
-use teloxide::{prelude::*, types::Me, utils::command::BotCommands};
+use teloxide::{
+    prelude::*,
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, Me},
+    utils::command::BotCommands,
+};
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -27,6 +31,10 @@ pub async fn handle_messages(bot: Bot, msg: Message, me: Me) -> ResponseResult<(
                     .await?
             }
             Ok(Command::Help | Command::Ayuda) => {
+                let keyboard = InlineKeyboardMarkup::new(vec![vec![
+                    InlineKeyboardButton::switch_inline_query("Buscar definición", ""),
+                ]]);
+
                 bot.parse_mode(teloxide::types::ParseMode::Html)
                     .send_message(
                         msg.chat.id,
@@ -35,6 +43,7 @@ pub async fn handle_messages(bot: Bot, msg: Message, me: Me) -> ResponseResult<(
                             bot_username = me.username()
                         ),
                     )
+                    .reply_markup(keyboard)
                     .await?
             }
             Ok(_) => {

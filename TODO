@@ -5,6 +5,7 @@
     -   [x] Handle commands that don't require database connection
         -   [x] `/start`
         -   [x] `/help`
+            -   [x] Add inline button for `/help`
     -   [ ] Add keyboard buttons
     -   [ ] Database
         -   [ ] Connect to database
