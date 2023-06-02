@@ -8,6 +8,7 @@
             -   [x] Add inline button for `/help`
     -   [x] Add keyboard buttons
     -   [ ] Database
+        -   [x] Create migrations
         -   [ ] Connect to database
         -   [ ] Models
         -   [ ] Handlers

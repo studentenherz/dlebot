@@ -22,7 +22,20 @@ I guess that, as this will be a learning project, in the end I'll get something 
 
 2. Set up environment variables. See [`.env-sample`](./.env-sample) for the list of required and optional environment variables. You can set them or use a `.env` file based on [`.env-sample`](./.env-sample).
 
-3. For development run the bot with
+3. Start the database
+
+    ```sh
+    docker compose up -d
+    ```
+
+4. Run the migrations, read [here](./migration/README.md) in order to see more detail.
+
+    ```sh
+    cd migration
+    cargo run
+    ```
+
+5. For development run the bot with
 
     ```sh
     cargo run
