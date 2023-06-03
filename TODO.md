@@ -10,7 +10,7 @@
     -   [ ] Database
         -   [x] Create migrations
         -   [ ] Connect to database
-        -   [ ] Models
+        -   [x] Models
         -   [ ] Handlers
             -   [ ] Dictionary
                 -   [ ] `get_list`
