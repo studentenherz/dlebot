@@ -4,6 +4,8 @@ use teloxide::{
     utils::command::BotCommands,
 };
 
+use crate::database::DatabaseHandler;
+
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
 enum Command {
@@ -21,15 +23,25 @@ enum Command {
     Suscripcion,
 }
 
-pub async fn handle_message(bot: Bot, msg: Message, me: Me) -> ResponseResult<()> {
+const KEY_RANDOM: &str = "🎲 Palabra aleatoria";
+const KEY_WOTD: &str = "📖 Palabra del día";
+const KEY_SUBSCRIPTION: &str = "🔔 Suscripción";
+const KEY_HELP: &str = "❔ Ayuda";
+
+pub async fn handle_message(
+    db_handler: DatabaseHandler,
+    bot: Bot,
+    msg: Message,
+    me: Me,
+) -> ResponseResult<()> {
     let keyboard = KeyboardMarkup::new([
         [
-            KeyboardButton::new("🎲 Palabra aleatoria"),
-            KeyboardButton::new("📖 Palabra del día"),
+            KeyboardButton::new(KEY_RANDOM),
+            KeyboardButton::new(KEY_WOTD),
         ],
         [
-            KeyboardButton::new("🔔 Suscripción"),
-            KeyboardButton::new("❔ Ayuda"),
+            KeyboardButton::new(KEY_SUBSCRIPTION),
+            KeyboardButton::new(KEY_HELP),
         ],
     ])
     .resize_keyboard(true);
@@ -68,7 +80,27 @@ pub async fn handle_message(bot: Bot, msg: Message, me: Me) -> ResponseResult<()
                     .await?
             }
 
-            Err(_) => bot.send_message(msg.chat.id, "Just text").await?,
+            Err(_) => match text {
+                KEY_RANDOM => bot.send_message(msg.chat.id, KEY_RANDOM).await?,
+                KEY_HELP => bot.send_message(msg.chat.id, KEY_HELP).await?,
+                KEY_SUBSCRIPTION => bot.send_message(msg.chat.id, KEY_SUBSCRIPTION).await?,
+                KEY_WOTD => bot.send_message(msg.chat.id, KEY_WOTD).await?,
+                _ => match db_handler.get_exact(text).await {
+                    Some(result) => {
+                        bot.parse_mode(teloxide::types::ParseMode::Html)
+                            .send_message(msg.chat.id, result.definition)
+                            .await?
+                    }
+                    None => {
+                        bot.parse_mode(teloxide::types::ParseMode::Html)
+                            .send_message(
+                                msg.chat.id,
+                                format!(include_str!("templates/not_found.txt"), text),
+                            )
+                            .await?
+                    }
+                },
+            },
         };
     }
     Ok(())

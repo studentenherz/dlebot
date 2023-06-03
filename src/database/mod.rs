@@ -9,6 +9,7 @@ use std::env;
 use self::schema::dle::{Column as DleColumn, Model as DleModel};
 use schema::prelude::Dle;
 
+#[derive(Clone)]
 pub struct DatabaseHandler {
     db: DatabaseConnection,
 }
