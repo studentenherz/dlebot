@@ -26,7 +26,8 @@
                 -   [ ] `get_users_ids`
                 -   [ ] `get_users_count`
                 -   [ ] `get_usage_last`
-    -   [ ] Find definition form message
+    -   [x] Find definition form message
+    -   [] Implement smart split of long messages
     -   [ ] Implement commands related to DB
         -   [ ] `/aleatorio`
         -   [ ] `/pdd`
