@@ -9,11 +9,11 @@
     -   [x] Add keyboard buttons
     -   [ ] Database
         -   [x] Create migrations
-        -   [ ] Connect to database
+        -   [x] Connect to database
         -   [x] Models
         -   [ ] Handlers
             -   [ ] Dictionary
-                -   [ ] `get_list`
+                -   [x] `get_list`
                 -   [ ] `get_definition`
                 -   [ ] `get_random`
                 -   [ ] `get_word_of_the_day`
