@@ -15,6 +15,7 @@ pub struct DatabaseHandler {
 }
 
 impl DatabaseHandler {
+    /// Get handler from uri
     pub async fn new(uri: String) -> Self {
         let opt = ConnectOptions::new(uri);
         let db = Database::connect(opt).await.unwrap();
@@ -22,23 +23,33 @@ impl DatabaseHandler {
         DatabaseHandler { db }
     }
 
+    /// Get handler with uri from the DATABASE_URL environment variable
     pub async fn from_env() -> Self {
         Self::new(env::var("DATABASE_URL").unwrap()).await
     }
 
+    /// Get list of the 10 first rows whose "lemma" starts with `query`.
+    /// This is case insensitive.
     pub async fn get_list_like(&self, query: &str) -> Vec<DleModel> {
         Dle::find()
-            .filter(DleColumn::Lemma.like(&format!("{}%", query)))
-            .order_by(DleColumn::Lemma, Order::Asc)
-            .limit(10)
+        .from_raw_sql(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            r#"SELECT * FROM "dle" WHERE "dle"."lemma" ILIKE $1 ORDER BY "dle"."lemma" ASC LIMIT 10"#,
+                [(format!("{}%", query)).into()],
+            ))
             .all(&self.db)
             .await
             .unwrap()
     }
 
+    /// Get row with "lemma" == `lemma`. Case insensitive.
     pub async fn get_exact(&self, lemma: &str) -> Option<DleModel> {
         Dle::find()
-            .filter(DleColumn::Lemma.eq(lemma))
+            .from_raw_sql(Statement::from_sql_and_values(
+                DbBackend::Postgres,
+                r#"SELECT * FROM "dle" WHERE "dle"."lemma" ILIKE $1 LIMIT 1"#,
+                [lemma.into()],
+            ))
             .one(&self.db)
             .await
             .unwrap()
