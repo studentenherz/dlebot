@@ -1,6 +1,7 @@
 mod database;
 mod handle_inline;
 mod handle_message;
+mod utils;
 
 use dotenvy::dotenv;
 use teloxide::prelude::*;
@@ -18,7 +19,7 @@ async fn main() {
     pretty_env_logger::init();
     log::info!("Starting command bot...");
 
-    let bot = Bot::from_env();
+    let bot = Bot::from_env().parse_mode(teloxide::types::ParseMode::Html);
 
     let handler = dptree::entry()
         .branch(Update::filter_message().endpoint(handle_message))
