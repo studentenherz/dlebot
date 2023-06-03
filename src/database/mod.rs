@@ -1,12 +1,9 @@
 mod schema;
 
-use sea_orm::{
-    ColumnTrait, ConnectOptions, Database, DatabaseConnection, DbBackend, EntityTrait, Order,
-    QueryFilter, QueryOrder, QuerySelect, Statement,
-};
+use sea_orm::{ConnectOptions, Database, DatabaseConnection, DbBackend, EntityTrait, Statement};
 use std::env;
 
-use self::schema::dle::{Column as DleColumn, Model as DleModel};
+use self::schema::dle::Model as DleModel;
 use schema::prelude::Dle;
 
 #[derive(Clone)]
