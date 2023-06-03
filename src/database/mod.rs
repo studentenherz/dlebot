@@ -25,7 +25,7 @@ impl DatabaseHandler {
         Self::new(env::var("DATABASE_URL").unwrap()).await
     }
 
-    pub async fn get_list(&self, query: &str) -> Vec<DleModel> {
+    pub async fn get_list_like(&self, query: &str) -> Vec<DleModel> {
         Dle::find()
             .filter(DleColumn::Lemma.like(&format!("{}%", query)))
             .order_by(DleColumn::Lemma, Order::Asc)

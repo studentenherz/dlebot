@@ -14,10 +14,9 @@ async fn main() {
     dotenv().ok();
 
     let db_handler = DatabaseHandler::from_env().await;
-    print!("{:?}", db_handler.get_list("ho").await);
 
-    pretty_env_logger::init();
-    log::info!("Starting command bot...");
+    let x = db_handler.get_list_like("ho").await;
+    println!("{:?}", x);
 
     let bot = Bot::from_env();
 
