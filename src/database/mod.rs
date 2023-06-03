@@ -1,8 +1,8 @@
 mod schema;
 
 use sea_orm::{
-    ColumnTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait, Order, QueryFilter,
-    QueryOrder, QuerySelect,
+    ColumnTrait, ConnectOptions, Database, DatabaseConnection, DbBackend, EntityTrait, Order,
+    QueryFilter, QueryOrder, QuerySelect, Statement,
 };
 use std::env;
 
@@ -31,6 +31,25 @@ impl DatabaseHandler {
             .order_by(DleColumn::Lemma, Order::Asc)
             .limit(10)
             .all(&self.db)
+            .await
+            .unwrap()
+    }
+
+    pub async fn get_exact(&self, lemma: &str) -> Option<DleModel> {
+        Dle::find()
+            .filter(DleColumn::Lemma.eq(lemma))
+            .one(&self.db)
+            .await
+            .unwrap()
+    }
+
+    pub async fn get_random(&self) -> Option<DleModel> {
+        Dle::find()
+            .from_raw_sql(Statement::from_string(
+                DbBackend::Postgres,
+                r#"SELECT * FROM "dle" ORDER BY RANDOM() LIMIT 1"#.to_string(),
+            ))
+            .one(&self.db)
             .await
             .unwrap()
     }

@@ -13,9 +13,9 @@
         -   [x] Models
         -   [ ] Handlers
             -   [ ] Dictionary
-                -   [x] `get_list`
-                -   [ ] `get_definition`
-                -   [ ] `get_random`
+                -   [x] `get_list` -> `get_list_like`
+                -   [x] `get_definition` -> `get_exact`
+                -   [x] `get_random`
                 -   [ ] `get_word_of_the_day`
             -   [ ] Usage
                 -   [ ] `add_message`
@@ -26,6 +26,7 @@
                 -   [ ] `get_users_ids`
                 -   [ ] `get_users_count`
                 -   [ ] `get_usage_last`
+    -   [ ] Find definition form message
     -   [ ] Implement commands related to DB
         -   [ ] `/aleatorio`
         -   [ ] `/pdd`
