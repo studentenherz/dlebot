@@ -90,76 +90,86 @@ pub async fn handle_message(
     msg: Message,
     me: Me,
 ) -> ResponseResult<()> {
-    if let Some(text) = msg.text() {
-        match BotCommands::parse(text, me.username()) {
-            Ok(Command::Start) => {
-                send_start(bot, msg).await?;
-            }
+    match msg.via_bot {
+        Some(via_bot) if via_bot.id == me.id => return Ok(()),
 
-            Ok(Command::Help | Command::Ayuda) => {
-                send_help(bot, msg, me).await?;
-            }
+        _ => {
+            if let Some(text) = msg.text() {
+                match BotCommands::parse(text, me.username()) {
+                    Ok(Command::Start) => {
+                        send_start(bot, msg).await?;
+                    }
 
-            Ok(Command::Aleatorio) => {
-                send_random(db_handler, bot, msg).await?;
-            }
+                    Ok(Command::Help | Command::Ayuda) => {
+                        send_help(bot, msg, me).await?;
+                    }
 
-            Ok(_) => {
-                bot.send_message(msg.chat.id, "Not implemented command")
-                    .await?;
-            }
+                    Ok(Command::Aleatorio) => {
+                        send_random(db_handler, bot, msg).await?;
+                    }
 
-            Err(_) => match text {
-                KEY_RANDOM => {
-                    send_random(db_handler, bot, msg).await?;
-                }
-                KEY_HELP => {
-                    send_help(bot, msg, me).await?;
-                }
-                KEY_SUBSCRIPTION => {
-                    bot.send_message(msg.chat.id, KEY_SUBSCRIPTION).await?;
-                }
-                KEY_WOTD => {
-                    bot.send_message(msg.chat.id, KEY_WOTD).await?;
-                }
-                _ => {
-                    bot.send_chat_action(msg.chat.id, ChatAction::Typing)
-                        .await?;
+                    Ok(_) => {
+                        bot.send_message(msg.chat.id, "Not implemented command")
+                            .await?;
+                    }
 
-                    match db_handler.get_exact(text).await {
-                        Some(result) => {
-                            for definition in smart_split(&result.definition, MAX_MASSAGE_LENGTH) {
-                                bot.send_message(msg.chat.id, definition).await?;
+                    Err(_) => match text {
+                        KEY_RANDOM => {
+                            send_random(db_handler, bot, msg).await?;
+                        }
+                        KEY_HELP => {
+                            send_help(bot, msg, me).await?;
+                        }
+                        KEY_SUBSCRIPTION => {
+                            bot.send_message(msg.chat.id, KEY_SUBSCRIPTION).await?;
+                        }
+                        KEY_WOTD => {
+                            bot.send_message(msg.chat.id, KEY_WOTD).await?;
+                        }
+                        _ => {
+                            bot.send_chat_action(msg.chat.id, ChatAction::Typing)
+                                .await?;
+
+                            match db_handler.get_exact(text).await {
+                                Some(result) => {
+                                    for definition in
+                                        smart_split(&result.definition, MAX_MASSAGE_LENGTH)
+                                    {
+                                        bot.send_message(msg.chat.id, definition).await?;
+                                    }
+                                }
+                                None => {
+                                    let url = match reqwest::Url::parse(&format!(
+                                        "https://dle.rae.es/{}",
+                                        text
+                                    )) {
+                                        Ok(value) => value,
+                                        Err(_) => {
+                                            reqwest::Url::parse("https://dle.rae.es/").unwrap()
+                                        }
+                                    };
+
+                                    let inline_keyboard = InlineKeyboardMarkup::new([[
+                                        InlineKeyboardButton::switch_inline_query_current_chat(
+                                            "Probar inline",
+                                            "",
+                                        ),
+                                        InlineKeyboardButton::url("Buscar en dle.rae.es", url),
+                                    ]]);
+
+                                    bot.send_message(
+                                        msg.chat.id,
+                                        format!(include_str!("templates/not_found.txt"), text),
+                                    )
+                                    .reply_markup(inline_keyboard)
+                                    .await?;
+                                }
                             }
                         }
-                        None => {
-                            let url = match reqwest::Url::parse(&format!(
-                                "https://dle.rae.es/{}",
-                                text
-                            )) {
-                                Ok(value) => value,
-                                Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
-                            };
-
-                            let inline_keyboard = InlineKeyboardMarkup::new([[
-                                InlineKeyboardButton::switch_inline_query_current_chat(
-                                    "Probar inline",
-                                    "",
-                                ),
-                                InlineKeyboardButton::url("Buscar en dle.rae.es", url),
-                            ]]);
-
-                            bot.send_message(
-                                msg.chat.id,
-                                format!(include_str!("templates/not_found.txt"), text),
-                            )
-                            .reply_markup(inline_keyboard)
-                            .await?;
-                        }
-                    }
-                }
-            },
-        };
+                    },
+                };
+            }
+        }
     }
     Ok(())
 }
