@@ -33,6 +33,46 @@ const KEY_SUBSCRIPTION: &str = "🔔 Suscripción";
 const KEY_HELP: &str = "❔ Ayuda";
 const MAX_MASSAGE_LENGTH: usize = 4096;
 
+async fn send_start(bot: DefaultParseMode<Bot>, msg: Message) -> ResponseResult<()> {
+    let keyboard = KeyboardMarkup::new([
+        [
+            KeyboardButton::new(KEY_RANDOM),
+            KeyboardButton::new(KEY_WOTD),
+        ],
+        [
+            KeyboardButton::new(KEY_SUBSCRIPTION),
+            KeyboardButton::new(KEY_HELP),
+        ],
+    ])
+    .resize_keyboard(true);
+
+    bot.send_message(msg.chat.id, include_str!("templates/start.txt"))
+        .disable_web_page_preview(true)
+        .reply_markup(keyboard)
+        .await?;
+
+    Ok(())
+}
+
+async fn send_help(bot: DefaultParseMode<Bot>, msg: Message, me: Me) -> ResponseResult<()> {
+    let inline_keyboard = InlineKeyboardMarkup::new([[InlineKeyboardButton::switch_inline_query(
+        "Buscar definición",
+        "",
+    )]]);
+
+    bot.send_message(
+        msg.chat.id,
+        format!(
+            include_str!("templates/help.txt"),
+            bot_username = me.username()
+        ),
+    )
+    .reply_markup(inline_keyboard)
+    .await?;
+
+    Ok(())
+}
+
 async fn send_random(
     db_handler: DatabaseHandler,
     bot: DefaultParseMode<Bot>,
@@ -51,43 +91,14 @@ pub async fn handle_message(
     msg: Message,
     me: Me,
 ) -> ResponseResult<()> {
-    let keyboard = KeyboardMarkup::new([
-        [
-            KeyboardButton::new(KEY_RANDOM),
-            KeyboardButton::new(KEY_WOTD),
-        ],
-        [
-            KeyboardButton::new(KEY_SUBSCRIPTION),
-            KeyboardButton::new(KEY_HELP),
-        ],
-    ])
-    .resize_keyboard(true);
-
     if let Some(text) = msg.text() {
         match BotCommands::parse(text, me.username()) {
             Ok(Command::Start) => {
-                bot.send_message(msg.chat.id, include_str!("templates/start.txt"))
-                    .disable_web_page_preview(true)
-                    .reply_markup(keyboard)
-                    .await?;
+                send_start(bot, msg).await?;
             }
 
             Ok(Command::Help | Command::Ayuda) => {
-                let inline_keyboard =
-                    InlineKeyboardMarkup::new([[InlineKeyboardButton::switch_inline_query(
-                        "Buscar definición",
-                        "",
-                    )]]);
-
-                bot.send_message(
-                    msg.chat.id,
-                    format!(
-                        include_str!("templates/help.txt"),
-                        bot_username = me.username()
-                    ),
-                )
-                .reply_markup(inline_keyboard)
-                .await?;
+                send_help(bot, msg, me).await?;
             }
 
             Ok(Command::Aleatorio) => {
@@ -104,7 +115,7 @@ pub async fn handle_message(
                     send_random(db_handler, bot, msg).await?;
                 }
                 KEY_HELP => {
-                    bot.send_message(msg.chat.id, KEY_HELP).await?;
+                    send_help(bot, msg, me).await?;
                 }
                 KEY_SUBSCRIPTION => {
                     bot.send_message(msg.chat.id, KEY_SUBSCRIPTION).await?;
