@@ -3,6 +3,7 @@ use teloxide::{
     prelude::*,
     types::{
         InlineQueryResult, InlineQueryResultArticle, InputMessageContent, InputMessageContentText,
+        ParseMode,
     },
 };
 
@@ -27,7 +28,9 @@ pub async fn handle_inline(
                 InlineQueryResultArticle::new(
                     format!("{}_{}", &word.lemma, id),
                     &word.lemma,
-                    InputMessageContent::Text(InputMessageContentText::new(part)),
+                    InputMessageContent::Text(
+                        InputMessageContentText::new(part).parse_mode(ParseMode::Html),
+                    ),
                 )
                 .description(part),
             ));
