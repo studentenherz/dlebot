@@ -16,6 +16,10 @@ pub async fn handle_inline(
     bot: DefaultParseMode<Bot>,
     q: InlineQuery,
 ) -> ResponseResult<()> {
+    if q.query.is_empty() {
+        return Ok(());
+    }
+
     let words = db_handler.get_list_like(&q.query).await;
 
     let mut results: Vec<InlineQueryResult> = vec![];
