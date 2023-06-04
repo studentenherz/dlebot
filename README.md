@@ -48,3 +48,5 @@ I guess that, as this will be a learning project, in the end I'll get something 
     ```
 
     For production use the `--release` option.
+
+7. To install in systemd run the script [`install.sh`](./install.sh) from the root of the repo.
