@@ -134,10 +134,27 @@ pub async fn handle_message(
                             }
                         }
                         None => {
+                            let url = match reqwest::Url::parse(&format!(
+                                "https://dle.rae.es/{}",
+                                text
+                            )) {
+                                Ok(value) => value,
+                                Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
+                            };
+
+                            let inline_keyboard = InlineKeyboardMarkup::new([[
+                                InlineKeyboardButton::switch_inline_query_current_chat(
+                                    "Probar inline",
+                                    "",
+                                ),
+                                InlineKeyboardButton::url("Buscar en dle.rae.es", url),
+                            ]]);
+
                             bot.send_message(
                                 msg.chat.id,
                                 format!(include_str!("templates/not_found.txt"), text),
                             )
+                            .reply_markup(inline_keyboard)
                             .await?;
                         }
                     }
