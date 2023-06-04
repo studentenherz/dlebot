@@ -19,3 +19,4 @@ sea-orm = { version = "0.11.3", features = [
     "sqlx-postgres",
     "runtime-tokio-rustls",
 ] }
+reqwest = "0.11.18"

@@ -640,6 +640,7 @@ dependencies = [
  "dotenvy",
  "log",
  "pretty_env_logger",
+ "reqwest",
  "sea-orm",
  "teloxide",
  "tokio",
