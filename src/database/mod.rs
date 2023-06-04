@@ -14,7 +14,9 @@ pub struct DatabaseHandler {
 impl DatabaseHandler {
     /// Get handler from uri
     pub async fn new(uri: String) -> Self {
-        let opt = ConnectOptions::new(uri);
+        let mut opt = ConnectOptions::new(uri);
+        opt.sqlx_logging(false);
+
         let db = Database::connect(opt).await.unwrap();
 
         DatabaseHandler { db }
