@@ -35,10 +35,18 @@ I guess that, as this will be a learning project, in the end I'll get something 
     cargo run
     ```
 
-5. For development run the bot with
+5. Populate the database from a .csv with the columns in the order `lemma, definition, conjugation` (or specify the order in the command, see [here](https://www.postgresql.org/docs/current/sql-copy.html)).
+
+    ```sh
+    cat dle.csv | psql $DATABASE_URL -c 'COPY dle FROM STDIN (FORMAT csv)'
+    ```
+
+6. For development run the bot with
 
     ```sh
     cargo run
     ```
 
     For production use the `--release` option.
+
+7. To install in systemd run the script [`install.sh`](./install.sh) from the root of the repo.
