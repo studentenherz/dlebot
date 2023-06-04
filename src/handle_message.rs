@@ -33,6 +33,18 @@ const KEY_SUBSCRIPTION: &str = "🔔 Suscripción";
 const KEY_HELP: &str = "❔ Ayuda";
 const MAX_MASSAGE_LENGTH: usize = 4096;
 
+async fn send_random(
+    db_handler: DatabaseHandler,
+    bot: DefaultParseMode<Bot>,
+    msg: Message,
+) -> ResponseResult<()> {
+    if let Some(result) = db_handler.get_random().await {
+        bot.send_message(msg.chat.id, result.definition).await?;
+    }
+
+    Ok(())
+}
+
 pub async fn handle_message(
     db_handler: DatabaseHandler,
     bot: DefaultParseMode<Bot>,
@@ -78,6 +90,10 @@ pub async fn handle_message(
                 .await?;
             }
 
+            Ok(Command::Aleatorio) => {
+                send_random(db_handler, bot, msg).await?;
+            }
+
             Ok(_) => {
                 bot.send_message(msg.chat.id, "Not implemented command")
                     .await?;
@@ -85,7 +101,7 @@ pub async fn handle_message(
 
             Err(_) => match text {
                 KEY_RANDOM => {
-                    bot.send_message(msg.chat.id, KEY_RANDOM).await?;
+                    send_random(db_handler, bot, msg).await?;
                 }
                 KEY_HELP => {
                     bot.send_message(msg.chat.id, KEY_HELP).await?;
