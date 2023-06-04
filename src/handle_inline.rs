@@ -1,5 +1,6 @@
 use teloxide::{
     adaptors::DefaultParseMode,
+    payloads::AnswerInlineQuery,
     prelude::*,
     types::{
         InlineQueryResult, InlineQueryResultArticle, InputMessageContent, InputMessageContentText,
@@ -37,7 +38,23 @@ pub async fn handle_inline(
         }
     }
 
-    bot.answer_inline_query(q.id, results).await?;
+    if results.is_empty() {
+        <Bot as Requester>::AnswerInlineQuery::new(
+            bot.inner().clone(),
+            AnswerInlineQuery {
+                inline_query_id: q.id,
+                results,
+                cache_time: None,
+                is_personal: None,
+                next_offset: None,
+                switch_pm_parameter: Some("404".to_string()),
+                switch_pm_text: Some("No se han encontrado resultados".to_string()),
+            },
+        )
+        .await?;
+    } else {
+        bot.answer_inline_query(q.id, results).await?;
+    }
 
     Ok(())
 }
