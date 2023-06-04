@@ -32,7 +32,7 @@
         -   [x] `/aleatorio`
         -   [ ] `/pdd`
         -   [ ] `/suscripcion`
-    -   [ ] Implement inline handler
+    -   [x] Implement inline handler
     -   [ ] Implement schedule
 
 #### New features

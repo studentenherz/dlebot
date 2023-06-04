@@ -8,7 +8,7 @@ use teloxide::{
 };
 
 use crate::database::DatabaseHandler;
-use crate::utils::smart_split;
+use crate::utils::{smart_split, MAX_MASSAGE_LENGTH};
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -31,7 +31,6 @@ const KEY_RANDOM: &str = "🎲 Palabra aleatoria";
 const KEY_WOTD: &str = "📖 Palabra del día";
 const KEY_SUBSCRIPTION: &str = "🔔 Suscripción";
 const KEY_HELP: &str = "❔ Ayuda";
-const MAX_MASSAGE_LENGTH: usize = 4096;
 
 async fn send_start(bot: DefaultParseMode<Bot>, msg: Message) -> ResponseResult<()> {
     let keyboard = KeyboardMarkup::new([

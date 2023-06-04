@@ -1,3 +1,5 @@
+pub const MAX_MASSAGE_LENGTH: usize = 4096;
+
 /// Split one string into multiple strings with a maximum length of `chars_per_string`.
 /// Splits by '\n', '. ' or ' ' in this priority.
 pub fn smart_split(text: &str, chars_per_string: usize) -> Vec<&str> {
