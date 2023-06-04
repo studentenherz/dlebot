@@ -29,7 +29,7 @@
     -   [x] Find definition form message
     -   [x] Implement smart split of long messages
     -   [ ] Implement commands related to DB
-        -   [ ] `/aleatorio`
+        -   [x] `/aleatorio`
         -   [ ] `/pdd`
         -   [ ] `/suscripcion`
     -   [ ] Implement inline handler
