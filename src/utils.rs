@@ -7,7 +7,7 @@ pub fn smart_split(text: &str, chars_per_string: usize) -> Vec<&str> {
     let mut left: usize = 0;
 
     while text.len() - left >= chars_per_string {
-        if let Some(pos) = text[left..=(left + chars_per_string)].rfind('\n') {
+        if let Some(pos) = text[left..(left + chars_per_string)].rfind('\n') {
             result.push(&text[left..=(left + pos)]);
             left += pos + 1;
         } else if let Some(pos) = text[left..(left + chars_per_string)].rfind(". ") {
@@ -17,8 +17,8 @@ pub fn smart_split(text: &str, chars_per_string: usize) -> Vec<&str> {
             result.push(&text[left..=(left + pos)]);
             left += pos + 1;
         } else {
-            result.push(&text[left..=(left + chars_per_string)]);
-            left += chars_per_string + 1;
+            result.push(&text[left..(left + chars_per_string)]);
+            left += chars_per_string;
         }
     }
     result.push(&text[left..]);
