@@ -27,6 +27,12 @@ enum Command {
     Suscripcion,
 }
 
+pub async fn set_commands(bot: DefaultParseMode<Bot>) -> ResponseResult<()> {
+    bot.set_my_commands(Command::bot_commands()).await?;
+
+    Ok(())
+}
+
 const KEY_RANDOM: &str = "🎲 Palabra aleatoria";
 const KEY_WOTD: &str = "📖 Palabra del día";
 const KEY_SUBSCRIPTION: &str = "🔔 Suscripción";
