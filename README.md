@@ -22,6 +22,8 @@ I guess that, as this will be a learning project, in the end I'll get something 
 
 2. Set up environment variables. See [`.env-sample`](./.env-sample) for the list of required and optional environment variables. You can set them or use a `.env` file based on [`.env-sample`](./.env-sample).
 
+    There you can set up a custom API url if you are using a local instance of [telegram-bot-api](https://github.com/tdlib/telegram-bot-api); there is no need for this, but the Telegram BOT API servers are located in Europe, depending on where you are running the bot, it might be better to run your own instance.
+
 3. Start the database
 
     ```sh
@@ -49,4 +51,4 @@ I guess that, as this will be a learning project, in the end I'll get something 
 
     For production use the `--release` option.
 
-7. To install in systemd run the script [`install.sh`](./install.sh) from the root of the repo.
+7. To install in systemd run the script [`install.sh`](./install.sh) from the root of the repo. Optionally, if you have a local instance of the BOT API you can install it to systemd with [`install-telegram-bot-api.sh`](./install-telegram-bot-api.sh)

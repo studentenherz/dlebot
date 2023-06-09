@@ -2,4 +2,4 @@ target
 .env
 .vscode
 pgdata
-dlebot.service
+*.service
