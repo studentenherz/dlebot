@@ -17,9 +17,15 @@ async fn main() -> ResponseResult<()> {
     let db_handler = DatabaseHandler::from_env().await;
 
     pretty_env_logger::init();
-    log::info!("Starting command bot...");
 
-    let bot = Bot::from_env().parse_mode(teloxide::types::ParseMode::Html);
+    let url = std::env::var("TELEGRAM_BOT_API_URL").unwrap();
+    let url = reqwest::Url::parse(&url).unwrap();
+
+    log::info!("Starting DLE bot with server {}...", url.as_str());
+
+    let bot = Bot::from_env()
+        .set_api_url(url)
+        .parse_mode(teloxide::types::ParseMode::Html);
 
     set_commands(bot.clone()).await?;
 
