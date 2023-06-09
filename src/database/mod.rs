@@ -54,6 +54,7 @@ impl DatabaseHandler {
             .unwrap()
     }
 
+    /// Get random word
     pub async fn get_random(&self) -> Option<DleModel> {
         Dle::find()
             .from_raw_sql(Statement::from_string(
