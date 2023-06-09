@@ -51,4 +51,4 @@ I guess that, as this will be a learning project, in the end I'll get something 
 
     For production use the `--release` option.
 
-7. To install in systemd run the script [`install.sh`](./install.sh) from the root of the repo.
+7. To install in systemd run the script [`install.sh`](./install.sh) from the root of the repo. Optionally, if you have a local instance of the BOT API you can install it to systemd with [`install-telegram-bot-api.sh`](./install-telegram-bot-api.sh)
