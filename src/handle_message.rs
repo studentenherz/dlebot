@@ -1,9 +1,7 @@
 use teloxide::{
     adaptors::DefaultParseMode,
     prelude::*,
-    types::{
-        ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me,
-    },
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me},
     utils::command::BotCommands,
 };
 
@@ -132,46 +130,39 @@ pub async fn handle_message(
                         KEY_WOTD => {
                             bot.send_message(msg.chat.id, KEY_WOTD).await?;
                         }
-                        _ => {
-                            bot.send_chat_action(msg.chat.id, ChatAction::Typing)
-                                .await?;
-
-                            match db_handler.get_exact(text).await {
-                                Some(result) => {
-                                    for definition in
-                                        smart_split(&result.definition, MAX_MASSAGE_LENGTH)
-                                    {
-                                        bot.send_message(msg.chat.id, definition).await?;
-                                    }
-                                }
-                                None => {
-                                    let url = match reqwest::Url::parse(&format!(
-                                        "https://dle.rae.es/{}",
-                                        text
-                                    )) {
-                                        Ok(value) => value,
-                                        Err(_) => {
-                                            reqwest::Url::parse("https://dle.rae.es/").unwrap()
-                                        }
-                                    };
-
-                                    let inline_keyboard = InlineKeyboardMarkup::new([[
-                                        InlineKeyboardButton::switch_inline_query_current_chat(
-                                            "Probar inline",
-                                            "",
-                                        ),
-                                        InlineKeyboardButton::url("Buscar en dle.rae.es", url),
-                                    ]]);
-
-                                    bot.send_message(
-                                        msg.chat.id,
-                                        format!(include_str!("templates/not_found.txt"), text),
-                                    )
-                                    .reply_markup(inline_keyboard)
-                                    .await?;
+                        _ => match db_handler.get_exact(text).await {
+                            Some(result) => {
+                                for definition in
+                                    smart_split(&result.definition, MAX_MASSAGE_LENGTH)
+                                {
+                                    bot.send_message(msg.chat.id, definition).await?;
                                 }
                             }
-                        }
+                            None => {
+                                let url = match reqwest::Url::parse(&format!(
+                                    "https://dle.rae.es/{}",
+                                    text
+                                )) {
+                                    Ok(value) => value,
+                                    Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
+                                };
+
+                                let inline_keyboard = InlineKeyboardMarkup::new([[
+                                    InlineKeyboardButton::switch_inline_query_current_chat(
+                                        "Probar inline",
+                                        "",
+                                    ),
+                                    InlineKeyboardButton::url("Buscar en dle.rae.es", url),
+                                ]]);
+
+                                bot.send_message(
+                                    msg.chat.id,
+                                    format!(include_str!("templates/not_found.txt"), text),
+                                )
+                                .reply_markup(inline_keyboard)
+                                .await?;
+                            }
+                        },
                     },
                 };
             }
