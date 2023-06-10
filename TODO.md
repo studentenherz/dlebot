@@ -39,4 +39,7 @@
 #### New features
 
 -   [ ] Handle edited messages
+-   [ ] Fuzzy search
 -   [ ] Conjugation
+-   [ ] Add other dictionaries
+-   [ ] (Far into the future) inverse search
