@@ -3,4 +3,5 @@
 pub mod prelude;
 
 pub mod dle;
+pub mod user;
 pub mod word_of_the_day;

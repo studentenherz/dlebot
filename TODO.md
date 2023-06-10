@@ -19,19 +19,13 @@
                 -   [x] `get_random`
                 -   [x] `get_word_of_the_day`
             -   [ ] Usage
-                -   [ ] `add_message`
-                -   [ ] `add_query`
-                -   [ ] `set_block`
-                -   [ ] `set_in_bot`
-                -   [ ] `is_subscribed`
-                -   [ ] `get_users_ids`
-                -   [ ] `get_users_count`
-                -   [ ] `get_usage_last`
+                -   [ ] Events
+                -   [x] Users
     -   [x] Find definition form message
     -   [x] Implement smart split of long messages
     -   [ ] Implement commands related to DB
         -   [x] `/aleatorio`
-        -   [ ] `/pdd`
+        -   [x] `/pdd`
         -   [ ] `/suscripcion`
     -   [x] Implement inline handler
     -   [ ] Implement schedule
