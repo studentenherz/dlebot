@@ -3,14 +3,20 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
-#[sea_orm(
-    rs_type = "String",
-    db_type = "Enum",
-    enum_name = "my_chat_member_update"
-)]
-pub enum MyChatMemberUpdate {
-    #[sea_orm(string_value = "joined")]
-    Joined,
-    #[sea_orm(string_value = "left")]
-    Left,
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "event_type")]
+pub enum EventType {
+    #[sea_orm(string_value = "callback_query")]
+    CallbackQuery,
+    #[sea_orm(string_value = "chosen_inline_result")]
+    ChosenInlineResult,
+    #[sea_orm(string_value = "edited_message")]
+    EditedMessage,
+    #[sea_orm(string_value = "message")]
+    Message,
+    #[sea_orm(string_value = "sent_definition")]
+    SentDefinition,
+    #[sea_orm(string_value = "user_joined")]
+    UserJoined,
+    #[sea_orm(string_value = "user_left")]
+    UserLeft,
 }

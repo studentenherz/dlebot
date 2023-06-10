@@ -10,8 +10,16 @@ impl MigrationTrait for Migration {
         manager
             .create_type(
                 Type::create()
-                    .as_enum(MyChatMemberUpdate::Table)
-                    .values([MyChatMemberUpdate::Joined, MyChatMemberUpdate::Left])
+                    .as_enum(EventType::Table)
+                    .values([
+                        EventType::Message,
+                        EventType::EditedMessage,
+                        EventType::ChosenInlineResult,
+                        EventType::CallbackQuery,
+                        EventType::UserLeft,
+                        EventType::UserJoined,
+                        EventType::SentDefinition,
+                    ])
                     .to_owned(),
             )
             .await?;
@@ -29,17 +37,28 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Event::UserId).big_unsigned().not_null())
-                    .col(ColumnDef::new(Event::Date).date_time().not_null())
-                    .col(ColumnDef::new(Event::ChatId).big_integer())
-                    .col(ColumnDef::new(Event::MessageId).unsigned())
+                    .col(
+                        ColumnDef::new(Event::EventType)
+                            .enumeration(
+                                EventType::Table,
+                                [
+                                    EventType::Message,
+                                    EventType::EditedMessage,
+                                    EventType::ChosenInlineResult,
+                                    EventType::CallbackQuery,
+                                    EventType::UserLeft,
+                                    EventType::UserJoined,
+                                    EventType::SentDefinition,
+                                ],
+                            )
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Event::Date).date_time())
                     .col(ColumnDef::new(Event::MessageText).text())
                     .col(ColumnDef::new(Event::ResultId).text())
                     .col(ColumnDef::new(Event::Query).text())
-                    .col(ColumnDef::new(Event::EditedMessage).boolean())
-                    .col(ColumnDef::new(Event::MyChatMember).enumeration(
-                        MyChatMemberUpdate::Table,
-                        [MyChatMemberUpdate::Joined, MyChatMemberUpdate::Left],
-                    ))
+                    .col(ColumnDef::new(Event::CallbackData).text())
+                    .col(ColumnDef::new(Event::LemmaSent).text())
                     .to_owned(),
             )
             .await
@@ -54,7 +73,7 @@ impl MigrationTrait for Migration {
             .drop_type(
                 Type::drop()
                     .if_exists()
-                    .name(MyChatMemberUpdate::Table)
+                    .name(EventType::Table)
                     .restrict()
                     .to_owned(),
             )
@@ -69,18 +88,22 @@ enum Event {
     Id,
     UserId,
     Date,
-    ChatId,
-    MessageId,
+    EventType,
     MessageText,
     ResultId,
     Query,
-    EditedMessage,
-    MyChatMember,
+    CallbackData,
+    LemmaSent,
 }
 
 #[derive(Iden)]
-enum MyChatMemberUpdate {
+enum EventType {
     Table, // Not really a Table but better than hardcoding the Iden impl by hand
-    Joined,
-    Left,
+    Message,
+    EditedMessage,
+    ChosenInlineResult,
+    CallbackQuery,
+    UserLeft,
+    UserJoined,
+    SentDefinition,
 }
