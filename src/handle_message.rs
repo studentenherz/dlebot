@@ -1,9 +1,7 @@
 use teloxide::{
     adaptors::DefaultParseMode,
     prelude::*,
-    types::{
-        ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me,
-    },
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me},
     utils::command::BotCommands,
 };
 
@@ -90,6 +88,21 @@ async fn send_random(
     Ok(())
 }
 
+async fn send_word_of_the_day(
+    db_handler: DatabaseHandler,
+    bot: DefaultParseMode<Bot>,
+    msg: Message,
+) -> ResponseResult<()> {
+    let definition = db_handler.get_word_of_the_day().await;
+    bot.send_message(
+        msg.chat.id,
+        format!("📖 Palabra del día\n\n {}", definition.trim()),
+    )
+    .await?;
+
+    Ok(())
+}
+
 pub async fn handle_message(
     db_handler: DatabaseHandler,
     bot: DefaultParseMode<Bot>,
@@ -114,6 +127,10 @@ pub async fn handle_message(
                         send_random(db_handler, bot, msg).await?;
                     }
 
+                    Ok(Command::Pdd) => {
+                        send_word_of_the_day(db_handler, bot, msg).await?;
+                    }
+
                     Ok(_) => {
                         bot.send_message(msg.chat.id, "Not implemented command")
                             .await?;
@@ -130,48 +147,41 @@ pub async fn handle_message(
                             bot.send_message(msg.chat.id, KEY_SUBSCRIPTION).await?;
                         }
                         KEY_WOTD => {
-                            bot.send_message(msg.chat.id, KEY_WOTD).await?;
+                            send_word_of_the_day(db_handler, bot, msg).await?;
                         }
-                        _ => {
-                            bot.send_chat_action(msg.chat.id, ChatAction::Typing)
-                                .await?;
-
-                            match db_handler.get_exact(text).await {
-                                Some(result) => {
-                                    for definition in
-                                        smart_split(&result.definition, MAX_MASSAGE_LENGTH)
-                                    {
-                                        bot.send_message(msg.chat.id, definition).await?;
-                                    }
-                                }
-                                None => {
-                                    let url = match reqwest::Url::parse(&format!(
-                                        "https://dle.rae.es/{}",
-                                        text
-                                    )) {
-                                        Ok(value) => value,
-                                        Err(_) => {
-                                            reqwest::Url::parse("https://dle.rae.es/").unwrap()
-                                        }
-                                    };
-
-                                    let inline_keyboard = InlineKeyboardMarkup::new([[
-                                        InlineKeyboardButton::switch_inline_query_current_chat(
-                                            "Probar inline",
-                                            "",
-                                        ),
-                                        InlineKeyboardButton::url("Buscar en dle.rae.es", url),
-                                    ]]);
-
-                                    bot.send_message(
-                                        msg.chat.id,
-                                        format!(include_str!("templates/not_found.txt"), text),
-                                    )
-                                    .reply_markup(inline_keyboard)
-                                    .await?;
+                        _ => match db_handler.get_exact(text).await {
+                            Some(result) => {
+                                for definition in
+                                    smart_split(&result.definition, MAX_MASSAGE_LENGTH)
+                                {
+                                    bot.send_message(msg.chat.id, definition).await?;
                                 }
                             }
-                        }
+                            None => {
+                                let url = match reqwest::Url::parse(&format!(
+                                    "https://dle.rae.es/{}",
+                                    text
+                                )) {
+                                    Ok(value) => value,
+                                    Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
+                                };
+
+                                let inline_keyboard = InlineKeyboardMarkup::new([[
+                                    InlineKeyboardButton::switch_inline_query_current_chat(
+                                        "Probar inline",
+                                        "",
+                                    ),
+                                    InlineKeyboardButton::url("Buscar en dle.rae.es", url),
+                                ]]);
+
+                                bot.send_message(
+                                    msg.chat.id,
+                                    format!(include_str!("templates/not_found.txt"), text),
+                                )
+                                .reply_markup(inline_keyboard)
+                                .await?;
+                            }
+                        },
                     },
                 };
             }
