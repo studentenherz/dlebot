@@ -88,6 +88,21 @@ async fn send_random(
     Ok(())
 }
 
+async fn send_word_of_the_day(
+    db_handler: DatabaseHandler,
+    bot: DefaultParseMode<Bot>,
+    msg: Message,
+) -> ResponseResult<()> {
+    let definition = db_handler.get_word_of_the_day().await;
+    bot.send_message(
+        msg.chat.id,
+        format!("📖 Palabra del día\n\n {}", definition.trim()),
+    )
+    .await?;
+
+    Ok(())
+}
+
 pub async fn handle_message(
     db_handler: DatabaseHandler,
     bot: DefaultParseMode<Bot>,
@@ -112,6 +127,10 @@ pub async fn handle_message(
                         send_random(db_handler, bot, msg).await?;
                     }
 
+                    Ok(Command::Pdd) => {
+                        send_word_of_the_day(db_handler, bot, msg).await?;
+                    }
+
                     Ok(_) => {
                         bot.send_message(msg.chat.id, "Not implemented command")
                             .await?;
@@ -128,7 +147,7 @@ pub async fn handle_message(
                             bot.send_message(msg.chat.id, KEY_SUBSCRIPTION).await?;
                         }
                         KEY_WOTD => {
-                            bot.send_message(msg.chat.id, KEY_WOTD).await?;
+                            send_word_of_the_day(db_handler, bot, msg).await?;
                         }
                         _ => match db_handler.get_exact(text).await {
                             Some(result) => {

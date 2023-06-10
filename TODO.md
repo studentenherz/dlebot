@@ -1,6 +1,7 @@
 ## ToDo
 
 -   [ ] Reproduce bot in Rust
+
     -   [x] Learn how to handle updates
     -   [x] Handle commands that don't require database connection
         -   [x] `/start`
@@ -12,11 +13,11 @@
         -   [x] Connect to database
         -   [x] Models
         -   [ ] Handlers
-            -   [ ] Dictionary
+            -   [x] Dictionary
                 -   [x] `get_list` -> `get_list_like`
                 -   [x] `get_definition` -> `get_exact`
                 -   [x] `get_random`
-                -   [ ] `get_word_of_the_day`
+                -   [x] `get_word_of_the_day`
             -   [ ] Usage
                 -   [ ] `add_message`
                 -   [ ] `add_query`
@@ -34,6 +35,8 @@
         -   [ ] `/suscripcion`
     -   [x] Implement inline handler
     -   [ ] Implement schedule
+
+    -   [ ] Handler possible errors
 
 #### New features
 
