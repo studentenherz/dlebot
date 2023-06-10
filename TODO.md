@@ -20,7 +20,11 @@
                 -   [x] `get_word_of_the_day`
             -   [ ] Usage
                 -   [ ] Events
-                -   [x] Users
+                    -   [x] Create migrations and models
+                    -   [ ] Handle the events
+                -   [ ] Users
+                    -   [x] Create migrations and models
+                    -   [ ] Handle users
     -   [x] Find definition form message
     -   [x] Implement smart split of long messages
     -   [ ] Implement commands related to DB

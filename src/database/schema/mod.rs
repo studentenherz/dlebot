@@ -3,5 +3,7 @@
 pub mod prelude;
 
 pub mod dle;
+pub mod event;
+pub mod sea_orm_active_enums;
 pub mod user;
 pub mod word_of_the_day;
