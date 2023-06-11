@@ -1,12 +1,12 @@
 use teloxide::{
     adaptors::DefaultParseMode,
     prelude::*,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me},
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me, User},
     utils::command::BotCommands,
 };
 
 use crate::database::DatabaseHandler;
-use crate::utils::{smart_split, MAX_MASSAGE_LENGTH};
+use crate::utils::{smart_split, DESUBS_CALLBACK_DATA, MAX_MASSAGE_LENGTH, SUBS_CALLBACK_DATA};
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -103,16 +103,63 @@ async fn send_word_of_the_day(
     Ok(())
 }
 
+async fn send_subscription(
+    db_handler: DatabaseHandler,
+    bot: DefaultParseMode<Bot>,
+    msg: Message,
+    user: &User,
+) -> ResponseResult<()> {
+    let subscribed = match db_handler.get_user(user.id.0.try_into().unwrap()).await {
+        Some(user) => user.subscribed,
+        None => false,
+    };
+
+    let inline_keyboard = InlineKeyboardMarkup::new([[InlineKeyboardButton::callback(
+        if subscribed {
+            "Desuscribirme"
+        } else {
+            "¡Suscribirme!"
+        },
+        if subscribed {
+            DESUBS_CALLBACK_DATA
+        } else {
+            SUBS_CALLBACK_DATA
+        },
+    )]]);
+
+    bot.send_message(
+        msg.chat.id,
+        format!(
+            include_str!("templates/subscription.txt"),
+            user.first_name,
+            if subscribed { "SÍ" } else { "NO" }
+        ),
+    )
+    .reply_markup(inline_keyboard)
+    .await?;
+
+    Ok(())
+}
+
 pub async fn handle_message(
     db_handler: DatabaseHandler,
     bot: DefaultParseMode<Bot>,
     msg: Message,
     me: Me,
 ) -> ResponseResult<()> {
+    let user = msg.from().unwrap().clone();
     match msg.via_bot {
         Some(via_bot) if via_bot.id == me.id => return Ok(()),
 
         _ => {
+            db_handler
+                .add_message_event(
+                    user.id.0.try_into().unwrap(),
+                    msg.date.into(),
+                    msg.text().unwrap_or("").to_string(),
+                )
+                .await;
+
             if let Some(text) = msg.text() {
                 match BotCommands::parse(text, me.username()) {
                     Ok(Command::Start) => {
@@ -131,9 +178,8 @@ pub async fn handle_message(
                         send_word_of_the_day(db_handler, bot, msg).await?;
                     }
 
-                    Ok(_) => {
-                        bot.send_message(msg.chat.id, "Not implemented command")
-                            .await?;
+                    Ok(Command::Suscripcion) => {
+                        send_subscription(db_handler, bot, msg, &user).await?;
                     }
 
                     Err(_) => match text {
@@ -144,7 +190,7 @@ pub async fn handle_message(
                             send_help(bot, msg, me).await?;
                         }
                         KEY_SUBSCRIPTION => {
-                            bot.send_message(msg.chat.id, KEY_SUBSCRIPTION).await?;
+                            send_subscription(db_handler, bot, msg, &user).await?;
                         }
                         KEY_WOTD => {
                             send_word_of_the_day(db_handler, bot, msg).await?;
@@ -156,6 +202,14 @@ pub async fn handle_message(
                                 {
                                     bot.send_message(msg.chat.id, definition).await?;
                                 }
+
+                                db_handler
+                                    .add_sent_definition_event(
+                                        user.id.0.try_into().unwrap(),
+                                        msg.date.into(),
+                                        result.lemma,
+                                    )
+                                    .await;
                             }
                             None => {
                                 let url = match reqwest::Url::parse(&format!(
@@ -187,5 +241,64 @@ pub async fn handle_message(
             }
         }
     }
+    Ok(())
+}
+
+pub async fn handle_edited_message(
+    db_handler: DatabaseHandler,
+    bot: DefaultParseMode<Bot>,
+    msg: Message,
+) -> ResponseResult<()> {
+    let user = msg.from().unwrap().clone();
+
+    if let Some(text) = msg.text() {
+        db_handler
+            .add_edited_message_event(
+                user.id.0.try_into().unwrap(),
+                msg.date.into(),
+                msg.text().unwrap_or("").to_string(),
+            )
+            .await;
+
+        match db_handler.get_exact(text).await {
+            Some(result) => {
+                for definition in smart_split(&result.definition, MAX_MASSAGE_LENGTH) {
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("😌 ¡Ahora sí!\n\n{}", definition.trim()),
+                    )
+                    .reply_to_message_id(msg.id)
+                    .await?;
+                }
+
+                db_handler
+                    .add_sent_definition_event(
+                        user.id.0.try_into().unwrap(),
+                        msg.date.into(),
+                        result.lemma,
+                    )
+                    .await;
+            }
+            None => {
+                let url = match reqwest::Url::parse(&format!("https://dle.rae.es/{}", text)) {
+                    Ok(value) => value,
+                    Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
+                };
+
+                let inline_keyboard = InlineKeyboardMarkup::new([[
+                    InlineKeyboardButton::switch_inline_query_current_chat("Probar inline", ""),
+                    InlineKeyboardButton::url("Buscar en dle.rae.es", url),
+                ]]);
+
+                let text = format!(include_str!("templates/not_found.txt"), text);
+
+                bot.send_message(msg.chat.id, format!("😐 Así tampoco\n\n{}", text))
+                    .reply_markup(inline_keyboard)
+                    .reply_to_message_id(msg.id)
+                    .await?;
+            }
+        }
+    }
+
     Ok(())
 }

@@ -1,20 +1,26 @@
 mod schema;
 
 use sea_orm::{
-    ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, DbBackend, EntityTrait, Set,
-    Statement,
+    entity::prelude::DateTimeWithTimeZone, ActiveModelTrait, ColumnTrait, ConnectOptions, Database,
+    DatabaseConnection, DbBackend, EntityTrait, QueryFilter, Set, Statement,
 };
 use std::env;
 
-use self::schema::{dle::Model as DleModel, word_of_the_day};
 use chrono::offset::Local;
-use schema::prelude::{Dle, WordOfTheDay};
+use schema::{
+    dle::Model as DleModel,
+    event,
+    prelude::{Dle, User, WordOfTheDay},
+    sea_orm_active_enums::EventType,
+    user, word_of_the_day,
+};
 
 #[derive(Clone)]
 pub struct DatabaseHandler {
     db: DatabaseConnection,
 }
 
+/// Dictionary implementations
 impl DatabaseHandler {
     /// Get handler from uri
     pub async fn new(uri: String) -> Self {
@@ -42,7 +48,10 @@ impl DatabaseHandler {
             ))
             .all(&self.db)
             .await
-            .unwrap()
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                vec![]
+            })
     }
 
     /// Get row with "lemma" == `lemma`. Case insensitive.
@@ -55,7 +64,10 @@ impl DatabaseHandler {
             ))
             .one(&self.db)
             .await
-            .unwrap()
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                None
+            })
     }
 
     /// Get random word
@@ -67,7 +79,10 @@ impl DatabaseHandler {
             ))
             .one(&self.db)
             .await
-            .unwrap()
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                None
+            })
     }
 
     /// Get word of the day: select a random word that hasn't been WOTD and returns it
@@ -83,20 +98,25 @@ impl DatabaseHandler {
             ))
             .one(&self.db)
             .await
-            .unwrap()
-        {
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                None
+            }) {
             Some(word_of_the_day::Model { lemma, .. }) => lemma,
             None => {
-                // Get a word that hasn't been WOTD
+                // Get a random word that hasn't been WOTD
                 let wotd = WordOfTheDay::find()
                     .from_raw_sql(Statement::from_string(
                         DbBackend::Postgres,
-                        r#"SELECT * FROM "word_of_the_day" WHERE "date" IS NULL LIMIT 1"#
+                        r#"SELECT * FROM "word_of_the_day" WHERE "date" IS NULL ORDER BY RANDOM() LIMIT 1"#
                             .to_string(),
                     ))
                     .one(&self.db)
                     .await
-                    .unwrap()
+                    .unwrap_or_else(|x| {
+                        log::error!("Error accessing the database: {:?}", x);
+                        None
+                    })
                     .unwrap();
 
                 // Set it to used today
@@ -110,5 +130,202 @@ impl DatabaseHandler {
 
         // Return the definition
         self.get_exact(&lemma).await.unwrap().definition
+    }
+}
+
+/// User implementations
+impl DatabaseHandler {
+    /// Get user
+    pub async fn get_user(&self, user_id: i64) -> Option<user::Model> {
+        User::find()
+            .filter(user::Column::Id.eq(user_id))
+            .one(&self.db)
+            .await
+            .unwrap()
+    }
+
+    /// Set subscribed status
+    pub async fn set_subscribed(&self, user_id: i64, subscribed: bool) {
+        if let Some(user) = self.get_user(user_id).await {
+            let mut user: user::ActiveModel = user.into();
+            user.subscribed = Set(subscribed);
+            user.in_bot = Set(true);
+            user.update(&self.db).await.unwrap();
+        } else {
+            let new_user = user::Model {
+                id: user_id,
+                subscribed,
+                blocked: false,
+                in_bot: true,
+                admin: false,
+            };
+            let new_user: user::ActiveModel = new_user.into();
+            new_user.insert(&self.db).await.unwrap();
+        }
+    }
+
+    /// Get list of subscribed users
+    pub async fn get_subscribed_and_in_bot_list(&self) -> Vec<i64> {
+        User::find()
+            .filter(
+                user::Column::Subscribed
+                    .eq(true)
+                    .and(user::Column::InBot.eq(true)),
+            )
+            .all(&self.db)
+            .await
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                vec![]
+            })
+            .iter()
+            .map(|m| m.id)
+            .collect()
+    }
+
+    /// Set blocked status
+    /// TODO: When the admin role is added, admins should be able to
+    /// ban users
+    pub async fn _set_blocked(&self, user_id: i64, blocked: bool) {
+        if let Some(user) = self.get_user(user_id).await {
+            let mut user: user::ActiveModel = user.into();
+            user.blocked = Set(blocked);
+            user.update(&self.db).await.unwrap();
+        }
+    }
+
+    /// Set in_bot status
+    pub async fn set_in_bot(&self, user_id: i64, in_bot: bool) {
+        if let Some(user) = self.get_user(user_id).await {
+            let mut user: user::ActiveModel = user.into();
+            user.in_bot = Set(in_bot);
+            user.update(&self.db).await.unwrap();
+        }
+    }
+
+    /// Set admin status
+    /// TODO:
+    pub async fn _set_admin(&self, user_id: i64, admin: bool) {
+        if let Some(user) = self.get_user(user_id).await {
+            let mut user: user::ActiveModel = user.into();
+            user.admin = Set(admin);
+            user.update(&self.db).await.unwrap();
+        }
+    }
+}
+
+/// Event implementations
+impl DatabaseHandler {
+    pub async fn add_message_event(
+        &self,
+        user_id: i64,
+        date: DateTimeWithTimeZone,
+        message_text: String,
+    ) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            event_type: Set(EventType::Message),
+            date: Set(Some(date)),
+            message_text: Set(Some(message_text)),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
+    }
+
+    pub async fn add_edited_message_event(
+        &self,
+        user_id: i64,
+        date: DateTimeWithTimeZone,
+        message_text: String,
+    ) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            event_type: Set(EventType::EditedMessage),
+            date: Set(Some(date)),
+            message_text: Set(Some(message_text)),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
+    }
+
+    pub async fn add_callback_query_event(&self, user_id: i64, callback_data: String) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            event_type: Set(EventType::CallbackQuery),
+            callback_data: Set(Some(callback_data)),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
+    }
+
+    pub async fn add_sent_definition_event(
+        &self,
+        user_id: i64,
+        date: DateTimeWithTimeZone,
+        lemma_sent: String,
+    ) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            date: Set(Some(date)),
+            event_type: Set(EventType::SentDefinition),
+            lemma_sent: Set(Some(lemma_sent)),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
+    }
+
+    pub async fn add_chosen_inline_result_event(
+        &self,
+        user_id: i64,
+        result_id: String,
+        query: String,
+    ) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            event_type: Set(EventType::ChosenInlineResult),
+            result_id: Set(Some(result_id)),
+            query: Set(Some(query)),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
+    }
+
+    pub async fn add_user_joined_event(&self, user_id: i64) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            event_type: Set(EventType::UserJoined),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
+    }
+
+    pub async fn add_user_left_event(&self, user_id: i64) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            event_type: Set(EventType::UserLeft),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
     }
 }

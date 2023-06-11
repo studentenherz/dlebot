@@ -1,14 +1,21 @@
+mod broadcast;
 mod database;
+mod handle_callback_query;
+mod handle_chat_member;
 mod handle_inline;
 mod handle_message;
+mod scheduler;
 mod utils;
 
 use dotenvy::dotenv;
 use teloxide::{prelude::*, update_listeners::webhooks};
 
 use database::DatabaseHandler;
-use handle_inline::handle_inline;
-use handle_message::{handle_message, set_commands};
+use handle_callback_query::handle_callback_query;
+use handle_chat_member::handle_my_chat_member;
+use handle_inline::{handle_chosen_inline_result, handle_inline};
+use handle_message::{handle_edited_message, handle_message, set_commands};
+use scheduler::schedule_word_of_the_day;
 
 #[tokio::main]
 async fn main() -> ResponseResult<()> {
@@ -41,9 +48,20 @@ async fn main() -> ResponseResult<()> {
 
     set_commands(bot.clone()).await?;
 
+    let scheduler_handle = tokio::spawn(schedule_word_of_the_day(
+        db_handler.clone(),
+        bot.clone(),
+        14,
+        21,
+    ));
+
     let handler = dptree::entry()
         .branch(Update::filter_message().endpoint(handle_message))
-        .branch(Update::filter_inline_query().endpoint(handle_inline));
+        .branch(Update::filter_edited_message().endpoint(handle_edited_message))
+        .branch(Update::filter_inline_query().endpoint(handle_inline))
+        .branch(Update::filter_chosen_inline_result().endpoint(handle_chosen_inline_result))
+        .branch(Update::filter_my_chat_member().endpoint(handle_my_chat_member))
+        .branch(Update::filter_callback_query().endpoint(handle_callback_query));
 
     Dispatcher::builder(bot, handler)
         .dependencies(dptree::deps![db_handler])
@@ -54,6 +72,8 @@ async fn main() -> ResponseResult<()> {
             LoggingErrorHandler::with_custom_text("An error from the update listener"),
         )
         .await;
+
+    scheduler_handle.abort();
 
     Ok(())
 }

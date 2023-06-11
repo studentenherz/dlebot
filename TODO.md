@@ -19,26 +19,27 @@
                 -   [x] `get_random`
                 -   [x] `get_word_of_the_day`
             -   [ ] Usage
-                -   [ ] `add_message`
-                -   [ ] `add_query`
-                -   [ ] `set_block`
-                -   [ ] `set_in_bot`
-                -   [ ] `is_subscribed`
-                -   [ ] `get_users_ids`
-                -   [ ] `get_users_count`
-                -   [ ] `get_usage_last`
+                -   [ ] Events
+                    -   [x] Create migrations and models
+                    -   [x] Handle the events
+                -   [ ] Users
+                    -   [x] Create migrations and models
+                    -   [ ] Handle users
     -   [x] Find definition form message
     -   [x] Implement smart split of long messages
-    -   [ ] Implement commands related to DB
+    -   [x] Implement commands related to DB
         -   [x] `/aleatorio`
-        -   [ ] `/pdd`
-        -   [ ] `/suscripcion`
+        -   [x] `/pdd`
+        -   [x] `/suscripcion`
     -   [x] Implement inline handler
-    -   [ ] Implement schedule
+    -   [x] Implement schedule
 
     -   [ ] Handler possible errors
 
 #### New features
 
--   [ ] Handle edited messages
+-   [x] Handle edited messages
+-   [ ] Fuzzy search
 -   [ ] Conjugation
+-   [ ] Add other dictionaries
+-   [ ] (Far into the future) inverse search
