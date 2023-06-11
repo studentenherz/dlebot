@@ -202,6 +202,14 @@ pub async fn handle_message(
                                 {
                                     bot.send_message(msg.chat.id, definition).await?;
                                 }
+
+                                db_handler
+                                    .add_sent_definition_event(
+                                        user.id.0.try_into().unwrap(),
+                                        msg.date.into(),
+                                        result.lemma,
+                                    )
+                                    .await;
                             }
                             None => {
                                 let url = match reqwest::Url::parse(&format!(

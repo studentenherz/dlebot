@@ -235,4 +235,98 @@ impl DatabaseHandler {
             log::error!("Error accessing the database: {:?}", x);
         };
     }
+
+    pub async fn add_edited_message_event(
+        &self,
+        user_id: i64,
+        date: DateTimeWithTimeZone,
+        message_text: String,
+    ) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            event_type: Set(EventType::EditedMessage),
+            date: Set(Some(date)),
+            message_text: Set(Some(message_text)),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
+    }
+
+    pub async fn add_callback_query_event(&self, user_id: i64, callback_data: String) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            event_type: Set(EventType::CallbackQuery),
+            callback_data: Set(Some(callback_data)),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
+    }
+
+    pub async fn add_sent_definition_event(
+        &self,
+        user_id: i64,
+        date: DateTimeWithTimeZone,
+        lemma_sent: String,
+    ) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            date: Set(Some(date)),
+            event_type: Set(EventType::SentDefinition),
+            lemma_sent: Set(Some(lemma_sent)),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
+    }
+
+    pub async fn add_chosen_inline_result_event(
+        &self,
+        user_id: i64,
+        result_id: String,
+        query: String,
+    ) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            event_type: Set(EventType::ChosenInlineResult),
+            result_id: Set(Some(result_id)),
+            query: Set(Some(query)),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
+    }
+
+    pub async fn add_user_joined_event(&self, user_id: i64) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            event_type: Set(EventType::UserJoined),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
+    }
+
+    pub async fn add_user_left_event(&self, user_id: i64) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            event_type: Set(EventType::UserLeft),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
+    }
 }
