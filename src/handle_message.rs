@@ -148,6 +148,11 @@ pub async fn handle_message(
     me: Me,
 ) -> ResponseResult<()> {
     let user = msg.from().unwrap().clone();
+
+    db_handler
+        .set_in_bot(user.id.0.try_into().unwrap(), true)
+        .await;
+
     match msg.via_bot {
         Some(via_bot) if via_bot.id == me.id => return Ok(()),
 
@@ -250,6 +255,10 @@ pub async fn handle_edited_message(
     msg: Message,
 ) -> ResponseResult<()> {
     let user = msg.from().unwrap().clone();
+
+    db_handler
+        .set_in_bot(user.id.0.try_into().unwrap(), true)
+        .await;
 
     if let Some(text) = msg.text() {
         db_handler
