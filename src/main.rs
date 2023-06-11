@@ -3,16 +3,17 @@ mod database;
 mod handle_callback_query;
 mod handle_inline;
 mod handle_message;
+mod scheduler;
 mod utils;
 
 use dotenvy::dotenv;
 use teloxide::{prelude::*, update_listeners::webhooks};
 
-use broadcast::broadcast_word_of_the_day;
 use database::DatabaseHandler;
 use handle_callback_query::handle_callback_query;
 use handle_inline::handle_inline;
 use handle_message::{handle_message, set_commands};
+use scheduler::schedule_word_of_the_day;
 
 #[tokio::main]
 async fn main() -> ResponseResult<()> {
@@ -45,7 +46,12 @@ async fn main() -> ResponseResult<()> {
 
     set_commands(bot.clone()).await?;
 
-    broadcast_word_of_the_day(&db_handler, bot.clone()).await?;
+    let scheduler_handle = tokio::spawn(schedule_word_of_the_day(
+        db_handler.clone(),
+        bot.clone(),
+        13,
+        45,
+    ));
 
     let handler = dptree::entry()
         .branch(Update::filter_message().endpoint(handle_message))
@@ -61,6 +67,8 @@ async fn main() -> ResponseResult<()> {
             LoggingErrorHandler::with_custom_text("An error from the update listener"),
         )
         .await;
+
+    scheduler_handle.abort();
 
     Ok(())
 }

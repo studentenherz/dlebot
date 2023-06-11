@@ -32,7 +32,7 @@
         -   [x] `/pdd`
         -   [x] `/suscripcion`
     -   [x] Implement inline handler
-    -   [ ] Implement schedule
+    -   [x] Implement schedule
 
     -   [ ] Handler possible errors
 

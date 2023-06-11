@@ -33,7 +33,7 @@ async fn broadcast(
 }
 
 pub async fn broadcast_word_of_the_day(
-    db_handler: &DatabaseHandler,
+    db_handler: DatabaseHandler,
     bot: DefaultParseMode<Bot>,
 ) -> ResponseResult<()> {
     broadcast(
