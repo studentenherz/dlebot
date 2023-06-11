@@ -217,6 +217,17 @@ pub async fn handle_message(
                                     .await;
                             }
                             None => {
+                                let fuzzy_list = db_handler.get_fuzzy_list(text).await;
+
+                                let similar_words = if fuzzy_list.is_empty() {
+                                    "".to_string()
+                                } else {
+                                    format!(
+                                        "Estas son algunas entradas parecidas:\n\n— {}",
+                                        fuzzy_list.join("\n— ")
+                                    )
+                                };
+
                                 let url = match reqwest::Url::parse(&format!(
                                     "https://dle.rae.es/{}",
                                     text
@@ -235,7 +246,10 @@ pub async fn handle_message(
 
                                 bot.send_message(
                                     msg.chat.id,
-                                    format!(include_str!("templates/not_found.txt"), text),
+                                    format!(
+                                        include_str!("templates/not_found.txt"),
+                                        text, similar_words
+                                    ),
                                 )
                                 .reply_markup(inline_keyboard)
                                 .await?;
@@ -299,7 +313,7 @@ pub async fn handle_edited_message(
                     InlineKeyboardButton::url("Buscar en dle.rae.es", url),
                 ]]);
 
-                let text = format!(include_str!("templates/not_found.txt"), text);
+                let text = format!(include_str!("templates/not_found.txt"), text, "");
 
                 bot.send_message(msg.chat.id, format!("😐 Así tampoco\n\n{}", text))
                     .reply_markup(inline_keyboard)
