@@ -43,7 +43,10 @@ impl DatabaseHandler {
             ))
             .all(&self.db)
             .await
-            .unwrap()
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                vec![]
+            })
     }
 
     /// Get row with "lemma" == `lemma`. Case insensitive.
@@ -56,7 +59,10 @@ impl DatabaseHandler {
             ))
             .one(&self.db)
             .await
-            .unwrap()
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                None
+            })
     }
 
     /// Get random word
@@ -68,7 +74,10 @@ impl DatabaseHandler {
             ))
             .one(&self.db)
             .await
-            .unwrap()
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                None
+            })
     }
 
     /// Get word of the day: select a random word that hasn't been WOTD and returns it
@@ -84,8 +93,10 @@ impl DatabaseHandler {
             ))
             .one(&self.db)
             .await
-            .unwrap()
-        {
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                None
+            }) {
             Some(word_of_the_day::Model { lemma, .. }) => lemma,
             None => {
                 // Get a word that hasn't been WOTD
@@ -97,7 +108,10 @@ impl DatabaseHandler {
                     ))
                     .one(&self.db)
                     .await
-                    .unwrap()
+                    .unwrap_or_else(|x| {
+                        log::error!("Error accessing the database: {:?}", x);
+                        None
+                    })
                     .unwrap();
 
                 // Set it to used today
@@ -151,7 +165,10 @@ impl DatabaseHandler {
             .filter(user::Column::Subscribed.eq(true))
             .all(&self.db)
             .await
-            .unwrap()
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                vec![]
+            })
             .iter()
             .map(|m| m.id)
             .collect()
