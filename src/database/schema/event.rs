@@ -10,7 +10,7 @@ pub struct Model {
     pub id: i32,
     pub user_id: i64,
     pub event_type: EventType,
-    pub date: Option<DateTime>,
+    pub date: Option<DateTimeWithTimeZone>,
     #[sea_orm(column_type = "Text", nullable)]
     pub message_text: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]

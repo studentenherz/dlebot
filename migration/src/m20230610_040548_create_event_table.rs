@@ -53,7 +53,7 @@ impl MigrationTrait for Migration {
                             )
                             .not_null(),
                     )
-                    .col(ColumnDef::new(Event::Date).date_time())
+                    .col(ColumnDef::new(Event::Date).timestamp_with_time_zone())
                     .col(ColumnDef::new(Event::MessageText).text())
                     .col(ColumnDef::new(Event::ResultId).text())
                     .col(ColumnDef::new(Event::Query).text())
