@@ -99,11 +99,11 @@ impl DatabaseHandler {
             }) {
             Some(word_of_the_day::Model { lemma, .. }) => lemma,
             None => {
-                // Get a word that hasn't been WOTD
+                // Get a random word that hasn't been WOTD
                 let wotd = WordOfTheDay::find()
                     .from_raw_sql(Statement::from_string(
                         DbBackend::Postgres,
-                        r#"SELECT * FROM "word_of_the_day" WHERE "date" IS NULL LIMIT 1"#
+                        r#"SELECT * FROM "word_of_the_day" WHERE "date" IS NULL ORDER BY RANDOM() LIMIT 1"#
                             .to_string(),
                     ))
                     .one(&self.db)
