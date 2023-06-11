@@ -1,7 +1,7 @@
 use teloxide::{
     adaptors::DefaultParseMode,
     prelude::*,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me},
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me, User},
     utils::command::BotCommands,
 };
 
@@ -107,8 +107,8 @@ async fn send_subscription(
     db_handler: DatabaseHandler,
     bot: DefaultParseMode<Bot>,
     msg: Message,
+    user: &User,
 ) -> ResponseResult<()> {
-    let user = msg.from().unwrap();
     let subscribed = match db_handler.get_user(user.id.0.try_into().unwrap()).await {
         Some(user) => user.subscribed,
         None => false,
@@ -147,10 +147,19 @@ pub async fn handle_message(
     msg: Message,
     me: Me,
 ) -> ResponseResult<()> {
+    let user = msg.from().unwrap().clone();
     match msg.via_bot {
         Some(via_bot) if via_bot.id == me.id => return Ok(()),
 
         _ => {
+            db_handler
+                .add_message_event(
+                    user.id.0.try_into().unwrap(),
+                    msg.date.into(),
+                    msg.text().unwrap_or("").to_string(),
+                )
+                .await;
+
             if let Some(text) = msg.text() {
                 match BotCommands::parse(text, me.username()) {
                     Ok(Command::Start) => {
@@ -170,7 +179,7 @@ pub async fn handle_message(
                     }
 
                     Ok(Command::Suscripcion) => {
-                        send_subscription(db_handler, bot, msg).await?;
+                        send_subscription(db_handler, bot, msg, &user).await?;
                     }
 
                     Err(_) => match text {
@@ -181,7 +190,7 @@ pub async fn handle_message(
                             send_help(bot, msg, me).await?;
                         }
                         KEY_SUBSCRIPTION => {
-                            send_subscription(db_handler, bot, msg).await?;
+                            send_subscription(db_handler, bot, msg, &user).await?;
                         }
                         KEY_WOTD => {
                             send_word_of_the_day(db_handler, bot, msg).await?;

@@ -1,14 +1,20 @@
 mod schema;
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectOptions, Database, DatabaseConnection, DbBackend,
-    EntityTrait, QueryFilter, Set, Statement,
+    entity::prelude::DateTimeWithTimeZone, query, ActiveModelBehavior, ActiveModelTrait,
+    ColumnTrait, ConnectOptions, Database, DatabaseConnection, DbBackend, EntityTrait, QueryFilter,
+    Set, Statement,
 };
 use std::env;
 
-use self::schema::{dle::Model as DleModel, user, word_of_the_day};
 use chrono::offset::Local;
-use schema::prelude::{Dle, User, WordOfTheDay};
+use schema::{
+    dle::Model as DleModel,
+    event,
+    prelude::{Dle, User, WordOfTheDay},
+    sea_orm_active_enums::EventType,
+    user, word_of_the_day,
+};
 
 #[derive(Clone)]
 pub struct DatabaseHandler {
@@ -206,5 +212,27 @@ impl DatabaseHandler {
             user.admin = Set(admin);
             user.update(&self.db).await.unwrap();
         }
+    }
+}
+
+/// Event implementations
+impl DatabaseHandler {
+    pub async fn add_message_event(
+        &self,
+        user_id: i64,
+        date: DateTimeWithTimeZone,
+        message_text: String,
+    ) {
+        let new_event = event::ActiveModel {
+            user_id: Set(user_id),
+            event_type: Set(EventType::Message),
+            date: Set(Some(date)),
+            message_text: Set(Some(message_text)),
+            ..Default::default()
+        };
+
+        if let Err(x) = new_event.insert(&self.db).await {
+            log::error!("Error accessing the database: {:?}", x);
+        };
     }
 }
