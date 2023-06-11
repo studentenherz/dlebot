@@ -51,8 +51,8 @@ async fn main() -> ResponseResult<()> {
     let scheduler_handle = tokio::spawn(schedule_word_of_the_day(
         db_handler.clone(),
         bot.clone(),
-        14,
-        21,
+        12,
+        00,
     ));
 
     let handler = dptree::entry()
