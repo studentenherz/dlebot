@@ -145,6 +145,18 @@ impl DatabaseHandler {
         }
     }
 
+    /// Get list of subscribed users
+    pub async fn get_subscribed_list(&self) -> Vec<i64> {
+        User::find()
+            .filter(user::Column::Subscribed.eq(true))
+            .all(&self.db)
+            .await
+            .unwrap()
+            .iter()
+            .map(|m| m.id)
+            .collect()
+    }
+
     /// Set blocked status
     /// TODO: When the admin role is added, admins should be able to
     /// ban users

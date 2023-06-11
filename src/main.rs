@@ -1,3 +1,4 @@
+mod broadcast;
 mod database;
 mod handle_callback_query;
 mod handle_inline;
@@ -7,6 +8,7 @@ mod utils;
 use dotenvy::dotenv;
 use teloxide::{prelude::*, update_listeners::webhooks};
 
+use broadcast::broadcast_word_of_the_day;
 use database::DatabaseHandler;
 use handle_callback_query::handle_callback_query;
 use handle_inline::handle_inline;
@@ -42,6 +44,8 @@ async fn main() -> ResponseResult<()> {
     );
 
     set_commands(bot.clone()).await?;
+
+    broadcast_word_of_the_day(&db_handler, bot.clone()).await?;
 
     let handler = dptree::entry()
         .branch(Update::filter_message().endpoint(handle_message))
