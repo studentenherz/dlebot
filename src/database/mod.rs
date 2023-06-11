@@ -160,9 +160,13 @@ impl DatabaseHandler {
     }
 
     /// Get list of subscribed users
-    pub async fn get_subscribed_list(&self) -> Vec<i64> {
+    pub async fn get_subscribed_and_in_bot_list(&self) -> Vec<i64> {
         User::find()
-            .filter(user::Column::Subscribed.eq(true))
+            .filter(
+                user::Column::Subscribed
+                    .eq(true)
+                    .and(user::Column::InBot.eq(true)),
+            )
             .all(&self.db)
             .await
             .unwrap_or_else(|x| {

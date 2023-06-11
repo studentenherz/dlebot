@@ -38,7 +38,7 @@ pub async fn broadcast_word_of_the_day(
 ) -> ResponseResult<()> {
     broadcast(
         db_handler.get_word_of_the_day().await,
-        db_handler.get_subscribed_list().await,
+        db_handler.get_subscribed_and_in_bot_list().await,
         bot,
     )
     .await
