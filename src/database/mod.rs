@@ -1,9 +1,8 @@
 mod schema;
 
 use sea_orm::{
-    entity::prelude::DateTimeWithTimeZone, query, ActiveModelBehavior, ActiveModelTrait,
-    ColumnTrait, ConnectOptions, Database, DatabaseConnection, DbBackend, EntityTrait, QueryFilter,
-    Set, Statement,
+    entity::prelude::DateTimeWithTimeZone, ActiveModelTrait, ColumnTrait, ConnectOptions, Database,
+    DatabaseConnection, DbBackend, EntityTrait, QueryFilter, Set, Statement,
 };
 use std::env;
 
@@ -196,7 +195,7 @@ impl DatabaseHandler {
     }
 
     /// Set in_bot status
-    pub async fn _set_in_bot(&self, user_id: i64, in_bot: bool) {
+    pub async fn set_in_bot(&self, user_id: i64, in_bot: bool) {
         if let Some(user) = self.get_user(user_id).await {
             let mut user: user::ActiveModel = user.into();
             user.in_bot = Set(in_bot);
