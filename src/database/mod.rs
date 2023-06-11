@@ -54,6 +54,26 @@ impl DatabaseHandler {
             })
     }
 
+    /// Get list of the 5 first lemmas that match `word` within distance of two.
+    /// This is case insensitive.
+    pub async fn get_fuzzy_list(&self, word: &str) -> Vec<String> {
+        Dle::find()
+            .from_raw_sql(Statement::from_sql_and_values(
+                DbBackend::Postgres,
+                r#"SELECT * FROM "dle" WHERE levenshtein(LOWER("lemma"), LOWER($1)) < 2 ORDER BY "lemma" LIMIT 5"#,
+                [word.into()],
+            ))
+            .all(&self.db)
+            .await
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                vec![]
+            })
+            .iter()
+            .map(|row| row.lemma.clone())
+            .collect()
+    }
+
     /// Get row with "lemma" == `lemma`. Case insensitive.
     pub async fn get_exact(&self, lemma: &str) -> Option<DleModel> {
         Dle::find()
@@ -144,6 +164,25 @@ impl DatabaseHandler {
             .unwrap()
     }
 
+    /// Get list of subscribed users
+    pub async fn get_subscribed_and_in_bot_list(&self) -> Vec<i64> {
+        User::find()
+            .filter(
+                user::Column::Subscribed
+                    .eq(true)
+                    .and(user::Column::InBot.eq(true)),
+            )
+            .all(&self.db)
+            .await
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                vec![]
+            })
+            .iter()
+            .map(|m| m.id)
+            .collect()
+    }
+
     /// Set subscribed status
     pub async fn set_subscribed(&self, user_id: i64, subscribed: bool) {
         if let Some(user) = self.get_user(user_id).await {
@@ -162,25 +201,6 @@ impl DatabaseHandler {
             let new_user: user::ActiveModel = new_user.into();
             new_user.insert(&self.db).await.unwrap();
         }
-    }
-
-    /// Get list of subscribed users
-    pub async fn get_subscribed_and_in_bot_list(&self) -> Vec<i64> {
-        User::find()
-            .filter(
-                user::Column::Subscribed
-                    .eq(true)
-                    .and(user::Column::InBot.eq(true)),
-            )
-            .all(&self.db)
-            .await
-            .unwrap_or_else(|x| {
-                log::error!("Error accessing the database: {:?}", x);
-                vec![]
-            })
-            .iter()
-            .map(|m| m.id)
-            .collect()
     }
 
     /// Set blocked status
