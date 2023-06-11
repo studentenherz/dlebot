@@ -51,7 +51,7 @@ pub async fn handle_inline(
                 cache_time: None,
                 is_personal: None,
                 next_offset: None,
-                switch_pm_parameter: Some("404".to_string()),
+                switch_pm_parameter: Some(q.query),
                 switch_pm_text: Some("No se han encontrado resultados".to_string()),
             },
         )

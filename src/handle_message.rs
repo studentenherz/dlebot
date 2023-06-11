@@ -12,7 +12,7 @@ use crate::utils::{smart_split, DESUBS_CALLBACK_DATA, MAX_MASSAGE_LENGTH, SUBS_C
 #[command(rename_rule = "lowercase")]
 enum Command {
     #[command(description = "Inicia el bot")]
-    Start,
+    Start(String),
     #[command(description = "Ayuda")]
     Help,
     #[command(description = "Cómo usarlo")]
@@ -141,6 +141,72 @@ async fn send_subscription(
     Ok(())
 }
 
+pub async fn send_message(
+    db_handler: DatabaseHandler,
+    bot: DefaultParseMode<Bot>,
+    msg: Message,
+    user: &User,
+    text: &str,
+    me: Me,
+) -> ResponseResult<()> {
+    match db_handler.get_exact(text).await {
+        Some(result) => {
+            for definition in smart_split(&result.definition, MAX_MASSAGE_LENGTH) {
+                bot.send_message(msg.chat.id, definition).await?;
+            }
+
+            db_handler
+                .add_sent_definition_event(
+                    user.id.0.try_into().unwrap(),
+                    msg.date.into(),
+                    result.lemma,
+                )
+                .await;
+        }
+        None => {
+            let fuzzy_list = db_handler.get_fuzzy_list(text).await;
+
+            let similar_words = if fuzzy_list.is_empty() {
+                "".to_string()
+            } else {
+                let list = fuzzy_list
+                    .iter()
+                    .map(|x| {
+                        format!(
+                            r#"<a href="https://t.me/{}?start={}">{}</a>"#,
+                            me.username(),
+                            x,
+                            x
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n— ");
+                format!("Estas son algunas entradas parecidas:\n\n— {}", list)
+            };
+
+            let url = match reqwest::Url::parse(&format!("https://dle.rae.es/{}", text)) {
+                Ok(value) => value,
+                Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
+            };
+
+            let inline_keyboard = InlineKeyboardMarkup::new([[
+                InlineKeyboardButton::switch_inline_query_current_chat("Probar inline", ""),
+                InlineKeyboardButton::url("Buscar en dle.rae.es", url),
+            ]]);
+
+            bot.send_message(
+                msg.chat.id,
+                format!(include_str!("templates/not_found.txt"), text, similar_words),
+            )
+            .disable_web_page_preview(true)
+            .reply_markup(inline_keyboard)
+            .await?;
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn handle_message(
     db_handler: DatabaseHandler,
     bot: DefaultParseMode<Bot>,
@@ -165,11 +231,16 @@ pub async fn handle_message(
                 )
                 .await;
 
-            if let Some(text) = msg.text() {
+            if let Some(text) = msg.clone().text() {
                 match BotCommands::parse(text, me.username()) {
-                    Ok(Command::Start) => {
-                        send_start(bot, msg).await?;
-                    }
+                    Ok(Command::Start(start_parameter)) => match start_parameter.as_ref() {
+                        "" => {
+                            send_start(bot, msg).await?;
+                        }
+                        _ => {
+                            send_message(db_handler, bot, msg, &user, &start_parameter, me).await?;
+                        }
+                    },
 
                     Ok(Command::Help | Command::Ayuda) => {
                         send_help(bot, msg, me).await?;
@@ -200,61 +271,9 @@ pub async fn handle_message(
                         KEY_WOTD => {
                             send_word_of_the_day(db_handler, bot, msg).await?;
                         }
-                        _ => match db_handler.get_exact(text).await {
-                            Some(result) => {
-                                for definition in
-                                    smart_split(&result.definition, MAX_MASSAGE_LENGTH)
-                                {
-                                    bot.send_message(msg.chat.id, definition).await?;
-                                }
-
-                                db_handler
-                                    .add_sent_definition_event(
-                                        user.id.0.try_into().unwrap(),
-                                        msg.date.into(),
-                                        result.lemma,
-                                    )
-                                    .await;
-                            }
-                            None => {
-                                let fuzzy_list = db_handler.get_fuzzy_list(text).await;
-
-                                let similar_words = if fuzzy_list.is_empty() {
-                                    "".to_string()
-                                } else {
-                                    format!(
-                                        "Estas son algunas entradas parecidas:\n\n— {}",
-                                        fuzzy_list.join("\n— ")
-                                    )
-                                };
-
-                                let url = match reqwest::Url::parse(&format!(
-                                    "https://dle.rae.es/{}",
-                                    text
-                                )) {
-                                    Ok(value) => value,
-                                    Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
-                                };
-
-                                let inline_keyboard = InlineKeyboardMarkup::new([[
-                                    InlineKeyboardButton::switch_inline_query_current_chat(
-                                        "Probar inline",
-                                        "",
-                                    ),
-                                    InlineKeyboardButton::url("Buscar en dle.rae.es", url),
-                                ]]);
-
-                                bot.send_message(
-                                    msg.chat.id,
-                                    format!(
-                                        include_str!("templates/not_found.txt"),
-                                        text, similar_words
-                                    ),
-                                )
-                                .reply_markup(inline_keyboard)
-                                .await?;
-                            }
-                        },
+                        _ => {
+                            send_message(db_handler, bot, msg, &user, text, me).await?;
+                        }
                     },
                 };
             }
