@@ -14,7 +14,7 @@ use database::DatabaseHandler;
 use handle_callback_query::handle_callback_query;
 use handle_chat_member::handle_my_chat_member;
 use handle_inline::{handle_chosen_inline_result, handle_inline};
-use handle_message::{handle_message, set_commands};
+use handle_message::{handle_edited_message, handle_message, set_commands};
 use scheduler::schedule_word_of_the_day;
 
 #[tokio::main]
@@ -57,6 +57,7 @@ async fn main() -> ResponseResult<()> {
 
     let handler = dptree::entry()
         .branch(Update::filter_message().endpoint(handle_message))
+        .branch(Update::filter_edited_message().endpoint(handle_edited_message))
         .branch(Update::filter_inline_query().endpoint(handle_inline))
         .branch(Update::filter_chosen_inline_result().endpoint(handle_chosen_inline_result))
         .branch(Update::filter_my_chat_member().endpoint(handle_my_chat_member))

@@ -21,7 +21,7 @@
             -   [ ] Usage
                 -   [ ] Events
                     -   [x] Create migrations and models
-                    -   [ ] Handle the events
+                    -   [x] Handle the events
                 -   [ ] Users
                     -   [x] Create migrations and models
                     -   [ ] Handle users
@@ -38,7 +38,7 @@
 
 #### New features
 
--   [ ] Handle edited messages
+-   [x] Handle edited messages
 -   [ ] Fuzzy search
 -   [ ] Conjugation
 -   [ ] Add other dictionaries

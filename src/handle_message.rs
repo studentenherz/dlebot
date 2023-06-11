@@ -243,3 +243,62 @@ pub async fn handle_message(
     }
     Ok(())
 }
+
+pub async fn handle_edited_message(
+    db_handler: DatabaseHandler,
+    bot: DefaultParseMode<Bot>,
+    msg: Message,
+) -> ResponseResult<()> {
+    let user = msg.from().unwrap().clone();
+
+    if let Some(text) = msg.text() {
+        db_handler
+            .add_edited_message_event(
+                user.id.0.try_into().unwrap(),
+                msg.date.into(),
+                msg.text().unwrap_or("").to_string(),
+            )
+            .await;
+
+        match db_handler.get_exact(text).await {
+            Some(result) => {
+                for definition in smart_split(&result.definition, MAX_MASSAGE_LENGTH) {
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("😌 ¡Ahora sí!\n\n{}", definition.trim()),
+                    )
+                    .reply_to_message_id(msg.id)
+                    .await?;
+                }
+
+                db_handler
+                    .add_sent_definition_event(
+                        user.id.0.try_into().unwrap(),
+                        msg.date.into(),
+                        result.lemma,
+                    )
+                    .await;
+            }
+            None => {
+                let url = match reqwest::Url::parse(&format!("https://dle.rae.es/{}", text)) {
+                    Ok(value) => value,
+                    Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
+                };
+
+                let inline_keyboard = InlineKeyboardMarkup::new([[
+                    InlineKeyboardButton::switch_inline_query_current_chat("Probar inline", ""),
+                    InlineKeyboardButton::url("Buscar en dle.rae.es", url),
+                ]]);
+
+                let text = format!(include_str!("templates/not_found.txt"), text);
+
+                bot.send_message(msg.chat.id, format!("😐 Así tampoco\n\n{}", text))
+                    .reply_markup(inline_keyboard)
+                    .reply_to_message_id(msg.id)
+                    .await?;
+            }
+        }
+    }
+
+    Ok(())
+}
