@@ -11,7 +11,7 @@ use teloxide::{prelude::*, update_listeners::webhooks};
 
 use database::DatabaseHandler;
 use handle_callback_query::handle_callback_query;
-use handle_inline::handle_inline;
+use handle_inline::{handle_chosen_inline_result, handle_inline};
 use handle_message::{handle_message, set_commands};
 use scheduler::schedule_word_of_the_day;
 
@@ -56,6 +56,7 @@ async fn main() -> ResponseResult<()> {
     let handler = dptree::entry()
         .branch(Update::filter_message().endpoint(handle_message))
         .branch(Update::filter_inline_query().endpoint(handle_inline))
+        .branch(Update::filter_chosen_inline_result().endpoint(handle_chosen_inline_result))
         .branch(Update::filter_callback_query().endpoint(handle_callback_query));
 
     Dispatcher::builder(bot, handler)
