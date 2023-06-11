@@ -14,6 +14,13 @@ pub async fn handle_callback_query(
     bot: DefaultParseMode<Bot>,
     query: CallbackQuery,
 ) -> ResponseResult<()> {
+    db_handler
+        .add_callback_query_event(
+            query.from.id.0.try_into().unwrap(),
+            query.clone().data.unwrap(),
+        )
+        .await;
+
     async fn edit_message(
         subscribed: bool,
         message: Message,
