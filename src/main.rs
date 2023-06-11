@@ -1,4 +1,5 @@
 mod database;
+mod handle_callback_query;
 mod handle_inline;
 mod handle_message;
 mod utils;
@@ -7,6 +8,7 @@ use dotenvy::dotenv;
 use teloxide::{prelude::*, update_listeners::webhooks};
 
 use database::DatabaseHandler;
+use handle_callback_query::handle_callback_query;
 use handle_inline::handle_inline;
 use handle_message::{handle_message, set_commands};
 
@@ -43,7 +45,8 @@ async fn main() -> ResponseResult<()> {
 
     let handler = dptree::entry()
         .branch(Update::filter_message().endpoint(handle_message))
-        .branch(Update::filter_inline_query().endpoint(handle_inline));
+        .branch(Update::filter_inline_query().endpoint(handle_inline))
+        .branch(Update::filter_callback_query().endpoint(handle_callback_query));
 
     Dispatcher::builder(bot, handler)
         .dependencies(dptree::deps![db_handler])

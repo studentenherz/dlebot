@@ -1,20 +1,21 @@
 mod schema;
 
 use sea_orm::{
-    ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, DbBackend, EntityTrait, Set,
-    Statement,
+    ActiveModelTrait, ColumnTrait, ConnectOptions, Database, DatabaseConnection, DbBackend,
+    EntityTrait, QueryFilter, Set, Statement,
 };
 use std::env;
 
-use self::schema::{dle::Model as DleModel, word_of_the_day};
+use self::schema::{dle::Model as DleModel, user, word_of_the_day};
 use chrono::offset::Local;
-use schema::prelude::{Dle, WordOfTheDay};
+use schema::prelude::{Dle, User, WordOfTheDay};
 
 #[derive(Clone)]
 pub struct DatabaseHandler {
     db: DatabaseConnection,
 }
 
+/// Dictionary implementations
 impl DatabaseHandler {
     /// Get handler from uri
     pub async fn new(uri: String) -> Self {
@@ -110,5 +111,67 @@ impl DatabaseHandler {
 
         // Return the definition
         self.get_exact(&lemma).await.unwrap().definition
+    }
+}
+
+/// User implementations
+impl DatabaseHandler {
+    /// Get user
+    pub async fn get_user(&self, user_id: i64) -> Option<user::Model> {
+        User::find()
+            .filter(user::Column::Id.eq(user_id))
+            .one(&self.db)
+            .await
+            .unwrap()
+    }
+
+    /// Set subscribed status
+    pub async fn set_subscribed(&self, user_id: i64, subscribed: bool) {
+        if let Some(user) = self.get_user(user_id).await {
+            let mut user: user::ActiveModel = user.into();
+            user.subscribed = Set(subscribed);
+            user.in_bot = Set(true);
+            user.update(&self.db).await.unwrap();
+        } else {
+            let new_user = user::Model {
+                id: user_id,
+                subscribed,
+                blocked: false,
+                in_bot: true,
+                admin: false,
+            };
+            let new_user: user::ActiveModel = new_user.into();
+            new_user.insert(&self.db).await.unwrap();
+        }
+    }
+
+    /// Set blocked status
+    /// TODO: When the admin role is added, admins should be able to
+    /// ban users
+    pub async fn _set_blocked(&self, user_id: i64, blocked: bool) {
+        if let Some(user) = self.get_user(user_id).await {
+            let mut user: user::ActiveModel = user.into();
+            user.blocked = Set(blocked);
+            user.update(&self.db).await.unwrap();
+        }
+    }
+
+    /// Set in_bot status
+    pub async fn _set_in_bot(&self, user_id: i64, in_bot: bool) {
+        if let Some(user) = self.get_user(user_id).await {
+            let mut user: user::ActiveModel = user.into();
+            user.in_bot = Set(in_bot);
+            user.update(&self.db).await.unwrap();
+        }
+    }
+
+    /// Set admin status
+    /// TODO:
+    pub async fn _set_admin(&self, user_id: i64, admin: bool) {
+        if let Some(user) = self.get_user(user_id).await {
+            let mut user: user::ActiveModel = user.into();
+            user.admin = Set(admin);
+            user.update(&self.db).await.unwrap();
+        }
     }
 }

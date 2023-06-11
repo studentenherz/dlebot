@@ -1,4 +1,6 @@
 pub const MAX_MASSAGE_LENGTH: usize = 4096;
+pub const SUBS_CALLBACK_DATA: &str = "__subs";
+pub const DESUBS_CALLBACK_DATA: &str = "__desubs";
 
 /// Split one string into multiple strings with a maximum length of `chars_per_string`.
 /// Splits by '\n', '. ' or ' ' in this priority.

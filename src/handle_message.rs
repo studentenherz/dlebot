@@ -6,7 +6,7 @@ use teloxide::{
 };
 
 use crate::database::DatabaseHandler;
-use crate::utils::{smart_split, MAX_MASSAGE_LENGTH};
+use crate::utils::{smart_split, DESUBS_CALLBACK_DATA, MAX_MASSAGE_LENGTH, SUBS_CALLBACK_DATA};
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -103,6 +103,44 @@ async fn send_word_of_the_day(
     Ok(())
 }
 
+async fn send_subscription(
+    db_handler: DatabaseHandler,
+    bot: DefaultParseMode<Bot>,
+    msg: Message,
+) -> ResponseResult<()> {
+    let user = msg.from().unwrap();
+    let subscribed = match db_handler.get_user(user.id.0.try_into().unwrap()).await {
+        Some(user) => user.subscribed,
+        None => false,
+    };
+
+    let inline_keyboard = InlineKeyboardMarkup::new([[InlineKeyboardButton::callback(
+        if subscribed {
+            "Desuscribirme"
+        } else {
+            "¡Suscribirme!"
+        },
+        if subscribed {
+            DESUBS_CALLBACK_DATA
+        } else {
+            SUBS_CALLBACK_DATA
+        },
+    )]]);
+
+    bot.send_message(
+        msg.chat.id,
+        format!(
+            include_str!("templates/subscription.txt"),
+            user.first_name,
+            if subscribed { "SÍ" } else { "NO" }
+        ),
+    )
+    .reply_markup(inline_keyboard)
+    .await?;
+
+    Ok(())
+}
+
 pub async fn handle_message(
     db_handler: DatabaseHandler,
     bot: DefaultParseMode<Bot>,
@@ -131,9 +169,8 @@ pub async fn handle_message(
                         send_word_of_the_day(db_handler, bot, msg).await?;
                     }
 
-                    Ok(_) => {
-                        bot.send_message(msg.chat.id, "Not implemented command")
-                            .await?;
+                    Ok(Command::Suscripcion) => {
+                        send_subscription(db_handler, bot, msg).await?;
                     }
 
                     Err(_) => match text {
@@ -144,7 +181,7 @@ pub async fn handle_message(
                             send_help(bot, msg, me).await?;
                         }
                         KEY_SUBSCRIPTION => {
-                            bot.send_message(msg.chat.id, KEY_SUBSCRIPTION).await?;
+                            send_subscription(db_handler, bot, msg).await?;
                         }
                         KEY_WOTD => {
                             send_word_of_the_day(db_handler, bot, msg).await?;

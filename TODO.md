@@ -27,10 +27,10 @@
                     -   [ ] Handle users
     -   [x] Find definition form message
     -   [x] Implement smart split of long messages
-    -   [ ] Implement commands related to DB
+    -   [x] Implement commands related to DB
         -   [x] `/aleatorio`
         -   [x] `/pdd`
-        -   [ ] `/suscripcion`
+        -   [x] `/suscripcion`
     -   [x] Implement inline handler
     -   [ ] Implement schedule
 
