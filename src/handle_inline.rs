@@ -4,17 +4,18 @@ use teloxide::{
     prelude::*,
     types::{
         InlineQueryResult, InlineQueryResultArticle, InputMessageContent, InputMessageContentText,
-        ParseMode,
+        Me, ParseMode,
     },
 };
 
 use crate::database::DatabaseHandler;
-use crate::utils::{smart_split, MAX_MASSAGE_LENGTH};
+use crate::utils::{base64_encode, smart_split, MAX_MASSAGE_LENGTH};
 
 pub async fn handle_inline(
     db_handler: DatabaseHandler,
     bot: DefaultParseMode<Bot>,
     q: InlineQuery,
+    me: Me,
 ) -> ResponseResult<()> {
     if q.query.is_empty() {
         return Ok(());
@@ -29,12 +30,31 @@ pub async fn handle_inline(
             .iter()
             .enumerate()
         {
+            let part = if id == 0 {
+                part.to_string()
+            } else {
+                format!("{}\n{}", &word.lemma, part)
+            };
+
+            let part_with_deep_link = part.replacen(
+                &word.lemma,
+                &format!(
+                    r#"<a href="https://t.me/{}?start={}">{}</a>"#,
+                    me.username(),
+                    base64_encode(word.lemma.clone()),
+                    word.lemma
+                ),
+                1,
+            );
+
             results.push(InlineQueryResult::Article(
                 InlineQueryResultArticle::new(
                     format!("{}_{}", &word.lemma, id),
                     &word.lemma,
                     InputMessageContent::Text(
-                        InputMessageContentText::new(part).parse_mode(ParseMode::Html),
+                        InputMessageContentText::new(part_with_deep_link)
+                            .disable_web_page_preview(true)
+                            .parse_mode(ParseMode::Html),
                     ),
                 )
                 .description(part),
@@ -51,7 +71,7 @@ pub async fn handle_inline(
                 cache_time: None,
                 is_personal: None,
                 next_offset: None,
-                switch_pm_parameter: Some(q.query),
+                switch_pm_parameter: Some(base64_encode(q.query)),
                 switch_pm_text: Some("No se han encontrado resultados".to_string()),
             },
         )

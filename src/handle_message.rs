@@ -6,7 +6,10 @@ use teloxide::{
 };
 
 use crate::database::DatabaseHandler;
-use crate::utils::{smart_split, DESUBS_CALLBACK_DATA, MAX_MASSAGE_LENGTH, SUBS_CALLBACK_DATA};
+use crate::utils::{
+    base64_decode, base64_encode, smart_split, DESUBS_CALLBACK_DATA, MAX_MASSAGE_LENGTH,
+    SUBS_CALLBACK_DATA,
+};
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -151,8 +154,27 @@ pub async fn send_message(
 ) -> ResponseResult<()> {
     match db_handler.get_exact(text).await {
         Some(result) => {
-            for definition in smart_split(&result.definition, MAX_MASSAGE_LENGTH) {
-                bot.send_message(msg.chat.id, definition).await?;
+            for (index, &definition) in smart_split(&result.definition, MAX_MASSAGE_LENGTH)
+                .iter()
+                .enumerate()
+            {
+                let definition = if index == 0 {
+                    definition.replacen(
+                        text,
+                        &format!(
+                            r#"<a href="https://t.me/{}?start={}">{}</a>"#,
+                            me.username(),
+                            base64_encode(text.to_string()),
+                            text
+                        ),
+                        1,
+                    )
+                } else {
+                    definition.to_string()
+                };
+                bot.send_message(msg.chat.id, definition)
+                    .disable_web_page_preview(true)
+                    .await?;
             }
 
             db_handler
@@ -175,7 +197,7 @@ pub async fn send_message(
                         format!(
                             r#"<a href="https://t.me/{}?start={}">{}</a>"#,
                             me.username(),
-                            x,
+                            base64_encode(x.to_string()),
                             x
                         )
                     })
@@ -233,14 +255,22 @@ pub async fn handle_message(
 
             if let Some(text) = msg.clone().text() {
                 match BotCommands::parse(text, me.username()) {
-                    Ok(Command::Start(start_parameter)) => match start_parameter.as_ref() {
-                        "" => {
-                            send_start(bot, msg).await?;
+                    Ok(Command::Start(start_parameter)) => {
+                        match base64_decode(start_parameter.clone()) {
+                            Ok(decoded) => match decoded.as_ref() {
+                                "" => {
+                                    send_start(bot, msg).await?;
+                                }
+                                _ => {
+                                    send_message(db_handler, bot, msg, &user, &decoded, me).await?;
+                                }
+                            },
+                            _ => {
+                                log::warn!("Failed to decode start_parameter {}", start_parameter);
+                                send_start(bot, msg).await?;
+                            }
                         }
-                        _ => {
-                            send_message(db_handler, bot, msg, &user, &start_parameter, me).await?;
-                        }
-                    },
+                    }
 
                     Ok(Command::Help | Command::Ayuda) => {
                         send_help(bot, msg, me).await?;
