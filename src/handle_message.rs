@@ -154,8 +154,27 @@ pub async fn send_message(
 ) -> ResponseResult<()> {
     match db_handler.get_exact(text).await {
         Some(result) => {
-            for definition in smart_split(&result.definition, MAX_MASSAGE_LENGTH) {
-                bot.send_message(msg.chat.id, definition).await?;
+            for (index, &definition) in smart_split(&result.definition, MAX_MASSAGE_LENGTH)
+                .iter()
+                .enumerate()
+            {
+                let definition = if index == 0 {
+                    definition.replacen(
+                        text,
+                        &format!(
+                            r#"<a href="https://t.me/{}?start={}">{}</a>"#,
+                            me.username(),
+                            base64_encode(text.to_string()),
+                            text
+                        ),
+                        1,
+                    )
+                } else {
+                    definition.to_string()
+                };
+                bot.send_message(msg.chat.id, definition)
+                    .disable_web_page_preview(true)
+                    .await?;
             }
 
             db_handler
