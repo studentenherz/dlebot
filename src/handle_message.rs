@@ -160,12 +160,12 @@ pub async fn send_message(
             {
                 let definition = if index == 0 {
                     definition.replacen(
-                        text,
+                        &result.lemma,
                         &format!(
                             r#"<a href="https://t.me/{}?start={}">{}</a>"#,
                             me.username(),
-                            base64_encode(text.to_string()),
-                            text
+                            base64_encode(result.lemma.to_string()),
+                            result.lemma
                         ),
                         1,
                     )
