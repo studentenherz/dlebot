@@ -9,7 +9,7 @@ use teloxide::{
 };
 
 use crate::database::DatabaseHandler;
-use crate::utils::{smart_split, MAX_MASSAGE_LENGTH};
+use crate::utils::{base64_encode, smart_split, MAX_MASSAGE_LENGTH};
 
 pub async fn handle_inline(
     db_handler: DatabaseHandler,
@@ -51,7 +51,7 @@ pub async fn handle_inline(
                 cache_time: None,
                 is_personal: None,
                 next_offset: None,
-                switch_pm_parameter: Some(q.query),
+                switch_pm_parameter: Some(base64_encode(q.query)),
                 switch_pm_text: Some("No se han encontrado resultados".to_string()),
             },
         )

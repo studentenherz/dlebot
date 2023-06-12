@@ -1,6 +1,14 @@
+use base64::{
+    alphabet,
+    engine::{self, general_purpose},
+    Engine as _,
+};
+
 pub const MAX_MASSAGE_LENGTH: usize = 4096;
 pub const SUBS_CALLBACK_DATA: &str = "__subs";
 pub const DESUBS_CALLBACK_DATA: &str = "__desubs";
+const CUSTOM_ENGINE: engine::GeneralPurpose =
+    engine::GeneralPurpose::new(&alphabet::URL_SAFE, general_purpose::NO_PAD);
 
 /// Split one string into multiple strings with a maximum length of `chars_per_string`.
 /// Splits by '\n', '. ' or ' ' in this priority.
@@ -26,6 +34,14 @@ pub fn smart_split(text: &str, chars_per_string: usize) -> Vec<&str> {
     result.push(&text[left..]);
 
     result
+}
+
+pub fn base64_encode(text: String) -> String {
+    CUSTOM_ENGINE.encode(text)
+}
+
+pub fn base64_decode(text: String) -> Result<String, base64::DecodeError> {
+    Ok(String::from_utf8(CUSTOM_ENGINE.decode(text)?).unwrap())
 }
 
 #[test]
