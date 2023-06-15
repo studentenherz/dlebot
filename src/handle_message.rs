@@ -1,7 +1,7 @@
 use teloxide::{
     adaptors::DefaultParseMode,
     prelude::*,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me, User},
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me},
     utils::command::BotCommands,
 };
 
@@ -110,9 +110,10 @@ async fn send_subscription(
     db_handler: DatabaseHandler,
     bot: DefaultParseMode<Bot>,
     msg: Message,
-    user: &User,
+    user_id: i64,
+    user_first_name: String,
 ) -> ResponseResult<()> {
-    let subscribed = match db_handler.get_user(user.id.0.try_into().unwrap()).await {
+    let subscribed = match db_handler.get_user(user_id).await {
         Some(user) => user.subscribed,
         None => false,
     };
@@ -134,7 +135,7 @@ async fn send_subscription(
         msg.chat.id,
         format!(
             include_str!("templates/subscription.txt"),
-            user.first_name,
+            user_first_name,
             if subscribed { "SÍ" } else { "NO" }
         ),
     )
@@ -148,7 +149,7 @@ pub async fn send_message(
     db_handler: DatabaseHandler,
     bot: DefaultParseMode<Bot>,
     msg: Message,
-    user: &User,
+    user_id: i64,
     text: &str,
     me: Me,
 ) -> ResponseResult<()> {
@@ -178,11 +179,7 @@ pub async fn send_message(
             }
 
             db_handler
-                .add_sent_definition_event(
-                    user.id.0.try_into().unwrap(),
-                    msg.date.into(),
-                    result.lemma,
-                )
+                .add_sent_definition_event(user_id, msg.date.into(), result.lemma)
                 .await;
         }
         None => {
@@ -235,77 +232,97 @@ pub async fn handle_message(
     msg: Message,
     me: Me,
 ) -> ResponseResult<()> {
-    let user = msg.from().unwrap().clone();
+    if let Some(user) = msg.clone().from() {
+        if let Ok(user_id) = user.id.0.try_into() {
+            db_handler.set_in_bot(user_id, true).await;
 
-    db_handler
-        .set_in_bot(user.id.0.try_into().unwrap(), true)
-        .await;
+            match msg.via_bot {
+                Some(via_bot) if via_bot.id == me.id => return Ok(()),
 
-    match msg.via_bot {
-        Some(via_bot) if via_bot.id == me.id => return Ok(()),
+                _ => {
+                    db_handler
+                        .add_message_event(
+                            user_id,
+                            msg.date.into(),
+                            msg.text().unwrap_or("").to_string(),
+                        )
+                        .await;
 
-        _ => {
-            db_handler
-                .add_message_event(
-                    user.id.0.try_into().unwrap(),
-                    msg.date.into(),
-                    msg.text().unwrap_or("").to_string(),
-                )
-                .await;
+                    if let Some(text) = msg.clone().text() {
+                        match BotCommands::parse(text, me.username()) {
+                            Ok(Command::Start(start_parameter)) => {
+                                match base64_decode(start_parameter.clone()) {
+                                    Ok(decoded) => match decoded.as_ref() {
+                                        "" => {
+                                            send_start(bot, msg).await?;
+                                        }
+                                        _ => {
+                                            send_message(
+                                                db_handler, bot, msg, user_id, &decoded, me,
+                                            )
+                                            .await?;
+                                        }
+                                    },
+                                    _ => {
+                                        log::warn!(
+                                            "Failed to decode start_parameter {}",
+                                            start_parameter
+                                        );
+                                        send_start(bot, msg).await?;
+                                    }
+                                }
+                            }
 
-            if let Some(text) = msg.clone().text() {
-                match BotCommands::parse(text, me.username()) {
-                    Ok(Command::Start(start_parameter)) => {
-                        match base64_decode(start_parameter.clone()) {
-                            Ok(decoded) => match decoded.as_ref() {
-                                "" => {
-                                    send_start(bot, msg).await?;
+                            Ok(Command::Help | Command::Ayuda) => {
+                                send_help(bot, msg, me).await?;
+                            }
+
+                            Ok(Command::Aleatorio) => {
+                                send_random(db_handler, bot, msg).await?;
+                            }
+
+                            Ok(Command::Pdd) => {
+                                send_word_of_the_day(db_handler, bot, msg).await?;
+                            }
+
+                            Ok(Command::Suscripcion) => {
+                                send_subscription(
+                                    db_handler,
+                                    bot,
+                                    msg,
+                                    user_id,
+                                    user.first_name.clone(),
+                                )
+                                .await?;
+                            }
+
+                            Err(_) => match text {
+                                KEY_RANDOM => {
+                                    send_random(db_handler, bot, msg).await?;
+                                }
+                                KEY_HELP => {
+                                    send_help(bot, msg, me).await?;
+                                }
+                                KEY_SUBSCRIPTION => {
+                                    send_subscription(
+                                        db_handler,
+                                        bot,
+                                        msg,
+                                        user_id,
+                                        user.first_name.clone(),
+                                    )
+                                    .await?;
+                                }
+                                KEY_WOTD => {
+                                    send_word_of_the_day(db_handler, bot, msg).await?;
                                 }
                                 _ => {
-                                    send_message(db_handler, bot, msg, &user, &decoded, me).await?;
+                                    send_message(db_handler, bot, msg, user_id, text, me).await?;
                                 }
                             },
-                            _ => {
-                                log::warn!("Failed to decode start_parameter {}", start_parameter);
-                                send_start(bot, msg).await?;
-                            }
-                        }
+                        };
                     }
-
-                    Ok(Command::Help | Command::Ayuda) => {
-                        send_help(bot, msg, me).await?;
-                    }
-
-                    Ok(Command::Aleatorio) => {
-                        send_random(db_handler, bot, msg).await?;
-                    }
-
-                    Ok(Command::Pdd) => {
-                        send_word_of_the_day(db_handler, bot, msg).await?;
-                    }
-
-                    Ok(Command::Suscripcion) => {
-                        send_subscription(db_handler, bot, msg, &user).await?;
-                    }
-
-                    Err(_) => match text {
-                        KEY_RANDOM => {
-                            send_random(db_handler, bot, msg).await?;
-                        }
-                        KEY_HELP => {
-                            send_help(bot, msg, me).await?;
-                        }
-                        KEY_SUBSCRIPTION => {
-                            send_subscription(db_handler, bot, msg, &user).await?;
-                        }
-                        KEY_WOTD => {
-                            send_word_of_the_day(db_handler, bot, msg).await?;
-                        }
-                        _ => {
-                            send_message(db_handler, bot, msg, &user, text, me).await?;
-                        }
-                    },
-                };
+                }
             }
         }
     }
@@ -317,60 +334,59 @@ pub async fn handle_edited_message(
     bot: DefaultParseMode<Bot>,
     msg: Message,
 ) -> ResponseResult<()> {
-    let user = msg.from().unwrap().clone();
+    if let Some(user) = msg.clone().from() {
+        if let Ok(user_id) = user.id.0.try_into() {
+            db_handler.set_in_bot(user_id, true).await;
 
-    db_handler
-        .set_in_bot(user.id.0.try_into().unwrap(), true)
-        .await;
-
-    if let Some(text) = msg.text() {
-        db_handler
-            .add_edited_message_event(
-                user.id.0.try_into().unwrap(),
-                msg.date.into(),
-                msg.text().unwrap_or("").to_string(),
-            )
-            .await;
-
-        match db_handler.get_exact(text).await {
-            Some(result) => {
-                for definition in smart_split(&result.definition, MAX_MASSAGE_LENGTH) {
-                    bot.send_message(
-                        msg.chat.id,
-                        format!("😌 ¡Ahora sí!\n\n{}", definition.trim()),
-                    )
-                    .reply_to_message_id(msg.id)
-                    .await?;
-                }
-
+            if let Some(text) = msg.text() {
                 db_handler
-                    .add_sent_definition_event(
-                        user.id.0.try_into().unwrap(),
+                    .add_edited_message_event(
+                        user_id,
                         msg.date.into(),
-                        result.lemma,
+                        msg.text().unwrap_or("").to_string(),
                     )
                     .await;
-            }
-            None => {
-                let url = match reqwest::Url::parse(&format!("https://dle.rae.es/{}", text)) {
-                    Ok(value) => value,
-                    Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
-                };
 
-                let inline_keyboard = InlineKeyboardMarkup::new([[
-                    InlineKeyboardButton::switch_inline_query_current_chat("Probar inline", ""),
-                    InlineKeyboardButton::url("Buscar en dle.rae.es", url),
-                ]]);
+                match db_handler.get_exact(text).await {
+                    Some(result) => {
+                        for definition in smart_split(&result.definition, MAX_MASSAGE_LENGTH) {
+                            bot.send_message(
+                                msg.chat.id,
+                                format!("😌 ¡Ahora sí!\n\n{}", definition.trim()),
+                            )
+                            .reply_to_message_id(msg.id)
+                            .await?;
+                        }
 
-                let text = format!(include_str!("templates/not_found.txt"), text, "");
+                        db_handler
+                            .add_sent_definition_event(user_id, msg.date.into(), result.lemma)
+                            .await;
+                    }
+                    None => {
+                        let url = match reqwest::Url::parse(&format!("https://dle.rae.es/{}", text))
+                        {
+                            Ok(value) => value,
+                            Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
+                        };
 
-                bot.send_message(msg.chat.id, format!("😐 Así tampoco\n\n{}", text))
-                    .reply_markup(inline_keyboard)
-                    .reply_to_message_id(msg.id)
-                    .await?;
+                        let inline_keyboard = InlineKeyboardMarkup::new([[
+                            InlineKeyboardButton::switch_inline_query_current_chat(
+                                "Probar inline",
+                                "",
+                            ),
+                            InlineKeyboardButton::url("Buscar en dle.rae.es", url),
+                        ]]);
+
+                        let text = format!(include_str!("templates/not_found.txt"), text, "");
+
+                        bot.send_message(msg.chat.id, format!("😐 Así tampoco\n\n{}", text))
+                            .reply_markup(inline_keyboard)
+                            .reply_to_message_id(msg.id)
+                            .await?;
+                    }
+                }
             }
         }
     }
-
     Ok(())
 }
