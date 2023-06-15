@@ -1,14 +1,16 @@
 use teloxide::{
-    adaptors::DefaultParseMode,
     prelude::*,
     types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me},
     utils::command::BotCommands,
 };
 
-use crate::database::DatabaseHandler;
-use crate::utils::{
-    base64_decode, base64_encode, smart_split, DESUBS_CALLBACK_DATA, MAX_MASSAGE_LENGTH,
-    SUBS_CALLBACK_DATA,
+use crate::{
+    database::DatabaseHandler,
+    utils::{
+        base64_decode, base64_encode, smart_split, DESUBS_CALLBACK_DATA, MAX_MASSAGE_LENGTH,
+        SUBS_CALLBACK_DATA,
+    },
+    DLEBot,
 };
 
 #[derive(BotCommands, Clone)]
@@ -28,7 +30,7 @@ enum Command {
     Suscripcion,
 }
 
-pub async fn set_commands(bot: DefaultParseMode<Bot>) -> ResponseResult<()> {
+pub async fn set_commands(bot: DLEBot) -> ResponseResult<()> {
     bot.set_my_commands(Command::bot_commands()).await?;
 
     Ok(())
@@ -39,7 +41,7 @@ const KEY_WOTD: &str = "📖 Palabra del día";
 const KEY_SUBSCRIPTION: &str = "🔔 Suscripción";
 const KEY_HELP: &str = "❔ Ayuda";
 
-async fn send_start(bot: DefaultParseMode<Bot>, msg: Message) -> ResponseResult<()> {
+async fn send_start(bot: DLEBot, msg: Message) -> ResponseResult<()> {
     let keyboard = KeyboardMarkup::new([
         [
             KeyboardButton::new(KEY_RANDOM),
@@ -60,7 +62,7 @@ async fn send_start(bot: DefaultParseMode<Bot>, msg: Message) -> ResponseResult<
     Ok(())
 }
 
-async fn send_help(bot: DefaultParseMode<Bot>, msg: Message, me: Me) -> ResponseResult<()> {
+async fn send_help(bot: DLEBot, msg: Message, me: Me) -> ResponseResult<()> {
     let inline_keyboard = InlineKeyboardMarkup::new([[InlineKeyboardButton::switch_inline_query(
         "Buscar definición",
         "",
@@ -79,11 +81,7 @@ async fn send_help(bot: DefaultParseMode<Bot>, msg: Message, me: Me) -> Response
     Ok(())
 }
 
-async fn send_random(
-    db_handler: DatabaseHandler,
-    bot: DefaultParseMode<Bot>,
-    msg: Message,
-) -> ResponseResult<()> {
+async fn send_random(db_handler: DatabaseHandler, bot: DLEBot, msg: Message) -> ResponseResult<()> {
     if let Some(result) = db_handler.get_random().await {
         bot.send_message(msg.chat.id, result.definition).await?;
     }
@@ -93,7 +91,7 @@ async fn send_random(
 
 async fn send_word_of_the_day(
     db_handler: DatabaseHandler,
-    bot: DefaultParseMode<Bot>,
+    bot: DLEBot,
     msg: Message,
 ) -> ResponseResult<()> {
     let definition = db_handler.get_word_of_the_day().await;
@@ -108,7 +106,7 @@ async fn send_word_of_the_day(
 
 async fn send_subscription(
     db_handler: DatabaseHandler,
-    bot: DefaultParseMode<Bot>,
+    bot: DLEBot,
     msg: Message,
     user_id: i64,
     user_first_name: String,
@@ -147,7 +145,7 @@ async fn send_subscription(
 
 pub async fn send_message(
     db_handler: DatabaseHandler,
-    bot: DefaultParseMode<Bot>,
+    bot: DLEBot,
     msg: Message,
     user_id: i64,
     text: &str,
@@ -228,7 +226,7 @@ pub async fn send_message(
 
 pub async fn handle_message(
     db_handler: DatabaseHandler,
-    bot: DefaultParseMode<Bot>,
+    bot: DLEBot,
     msg: Message,
     me: Me,
 ) -> ResponseResult<()> {
@@ -331,7 +329,7 @@ pub async fn handle_message(
 
 pub async fn handle_edited_message(
     db_handler: DatabaseHandler,
-    bot: DefaultParseMode<Bot>,
+    bot: DLEBot,
     msg: Message,
 ) -> ResponseResult<()> {
     if let Some(user) = msg.clone().from() {

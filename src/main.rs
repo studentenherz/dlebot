@@ -8,7 +8,7 @@ mod scheduler;
 mod utils;
 
 use dotenvy::dotenv;
-use teloxide::{prelude::*, update_listeners::webhooks};
+use teloxide::{adaptors::DefaultParseMode, prelude::*, update_listeners::webhooks};
 
 use database::DatabaseHandler;
 use handle_callback_query::handle_callback_query;
@@ -16,6 +16,8 @@ use handle_chat_member::handle_my_chat_member;
 use handle_inline::{handle_chosen_inline_result, handle_inline};
 use handle_message::{handle_edited_message, handle_message, set_commands};
 use scheduler::schedule_word_of_the_day;
+
+pub type DLEBot = DefaultParseMode<Bot>;
 
 #[tokio::main]
 async fn main() -> ResponseResult<()> {

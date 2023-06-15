@@ -1,5 +1,4 @@
 use teloxide::{
-    adaptors::DefaultParseMode,
     prelude::*,
     types::{InlineKeyboardButton, InlineKeyboardMarkup, User},
 };
@@ -7,11 +6,12 @@ use teloxide::{
 use crate::{
     database::DatabaseHandler,
     utils::{DESUBS_CALLBACK_DATA, SUBS_CALLBACK_DATA},
+    DLEBot,
 };
 
 pub async fn handle_callback_query(
     db_handler: DatabaseHandler,
-    bot: DefaultParseMode<Bot>,
+    bot: DLEBot,
     query: CallbackQuery,
 ) -> ResponseResult<()> {
     db_handler
@@ -25,7 +25,7 @@ pub async fn handle_callback_query(
         subscribed: bool,
         message: Message,
         user: User,
-        bot: DefaultParseMode<Bot>,
+        bot: DLEBot,
     ) -> ResponseResult<()> {
         let inline_keyboard = InlineKeyboardMarkup::new([[InlineKeyboardButton::callback(
             if subscribed {

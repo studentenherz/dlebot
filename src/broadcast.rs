@@ -1,17 +1,9 @@
-use teloxide::{adaptors::DefaultParseMode, prelude::*};
+use teloxide::prelude::*;
 
-use crate::database::DatabaseHandler;
+use crate::{database::DatabaseHandler, DLEBot};
 
-async fn broadcast(
-    message: String,
-    users: Vec<i64>,
-    bot: DefaultParseMode<Bot>,
-) -> ResponseResult<()> {
-    async fn send_message(
-        user_id: i64,
-        bot: DefaultParseMode<Bot>,
-        wotd: String,
-    ) -> ResponseResult<()> {
+async fn broadcast(message: String, users: Vec<i64>, bot: DLEBot) -> ResponseResult<()> {
+    async fn send_message(user_id: i64, bot: DLEBot, wotd: String) -> ResponseResult<()> {
         bot.send_message(
             ChatId(user_id),
             format!("📖 Palabra del día\n\n {}", wotd.clone().trim()),
@@ -34,7 +26,7 @@ async fn broadcast(
 
 pub async fn broadcast_word_of_the_day(
     db_handler: DatabaseHandler,
-    bot: DefaultParseMode<Bot>,
+    bot: DLEBot,
 ) -> ResponseResult<()> {
     broadcast(
         db_handler.get_word_of_the_day().await,
