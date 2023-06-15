@@ -1,8 +1,7 @@
 use chrono::{Duration, Local, Timelike};
-use teloxide::{adaptors::DefaultParseMode, prelude::*};
 use tokio::time::{interval_at, Duration as StdDuration, Instant};
 
-use crate::{broadcast::broadcast_word_of_the_day, database::DatabaseHandler};
+use crate::{broadcast::broadcast_word_of_the_day, database::DatabaseHandler, DLEBot};
 
 const SECONDS_IN_A_DAY: u64 = 24 * 60 * 60;
 
@@ -17,7 +16,7 @@ const SECONDS_IN_A_DAY: u64 = 24 * 60 * 60;
 ///
 pub async fn schedule_word_of_the_day(
     db_handler: DatabaseHandler,
-    bot: DefaultParseMode<Bot>,
+    bot: DLEBot,
     hour: u32,
     min: u32,
 ) {

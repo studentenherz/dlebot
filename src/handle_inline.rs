@@ -1,5 +1,4 @@
 use teloxide::{
-    adaptors::DefaultParseMode,
     payloads::AnswerInlineQuery,
     prelude::*,
     types::{
@@ -8,12 +7,15 @@ use teloxide::{
     },
 };
 
-use crate::database::DatabaseHandler;
-use crate::utils::{base64_encode, smart_split, MAX_MASSAGE_LENGTH};
+use crate::{
+    database::DatabaseHandler,
+    utils::{base64_encode, smart_split, MAX_MASSAGE_LENGTH},
+    DLEBot,
+};
 
 pub async fn handle_inline(
     db_handler: DatabaseHandler,
-    bot: DefaultParseMode<Bot>,
+    bot: DLEBot,
     q: InlineQuery,
     me: Me,
 ) -> ResponseResult<()> {
@@ -87,13 +89,11 @@ pub async fn handle_chosen_inline_result(
     db_handler: DatabaseHandler,
     chosen: ChosenInlineResult,
 ) -> ResponseResult<()> {
-    db_handler
-        .add_chosen_inline_result_event(
-            chosen.from.id.0.try_into().unwrap(),
-            chosen.result_id,
-            chosen.query,
-        )
-        .await;
+    if let Ok(chosen_id) = chosen.from.id.0.try_into() {
+        db_handler
+            .add_chosen_inline_result_event(chosen_id, chosen.result_id, chosen.query)
+            .await;
+    }
 
     Ok(())
 }
