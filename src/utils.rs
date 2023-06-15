@@ -40,8 +40,14 @@ pub fn base64_encode(text: String) -> String {
     CUSTOM_ENGINE.encode(text)
 }
 
-pub fn base64_decode(text: String) -> Result<String, base64::DecodeError> {
-    Ok(String::from_utf8(CUSTOM_ENGINE.decode(text)?).unwrap())
+pub fn base64_decode(text: String) -> Result<String, &'static str> {
+    if let Ok(decoded_vec) = CUSTOM_ENGINE.decode(text) {
+        if let Ok(decoded) = String::from_utf8(decoded_vec) {
+            return Ok(decoded);
+        }
+    }
+
+    Err("Error decoding")
 }
 
 #[test]
