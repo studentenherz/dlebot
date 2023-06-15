@@ -106,11 +106,11 @@ impl DatabaseHandler {
     }
 
     /// Get word of the day: select a random word that hasn't been WOTD and returns it
-    pub async fn get_word_of_the_day(&self) -> String {
+    pub async fn get_word_of_the_day(&self) -> Result<String, &'static str> {
         let today = Local::now().date_naive();
 
         // Get a word that has today's date
-        let lemma = match WordOfTheDay::find()
+        if let Some(lemma) = match WordOfTheDay::find()
             .from_raw_sql(Statement::from_sql_and_values(
                 DbBackend::Postgres,
                 r#"SELECT * FROM "word_of_the_day" WHERE "date" = $1 LIMIT 1"#,
@@ -122,10 +122,10 @@ impl DatabaseHandler {
                 log::error!("Error accessing the database: {:?}", x);
                 None
             }) {
-            Some(word_of_the_day::Model { lemma, .. }) => lemma,
+            Some(word_of_the_day::Model { lemma, .. }) => Some(lemma),
             None => {
                 // Get a random word that hasn't been WOTD
-                let wotd = WordOfTheDay::find()
+                if let Some(wotd) = WordOfTheDay::find()
                     .from_raw_sql(Statement::from_string(
                         DbBackend::Postgres,
                         r#"SELECT * FROM "word_of_the_day" WHERE "date" IS NULL ORDER BY RANDOM() LIMIT 1"#
@@ -136,20 +136,30 @@ impl DatabaseHandler {
                     .unwrap_or_else(|x| {
                         log::error!("Error accessing the database: {:?}", x);
                         None
-                    })
-                    .unwrap();
+                    }){
+                        // Set it to used today
+                        let mut active_wotd: word_of_the_day::ActiveModel = wotd.clone().into();
+                        active_wotd.date = Set(Some(today));
+                        match active_wotd.update(&self.db).await {
+                            Ok(_) => {}
+                            Err(x) => {
+                                log::error!("Error accessing the database: {:?}", x);
+                            }
+                        }
 
-                // Set it to used today
-                let mut active_wotd: word_of_the_day::ActiveModel = wotd.clone().into();
-                active_wotd.date = Set(Some(today));
-                active_wotd.update(&self.db).await.unwrap();
-
-                wotd.lemma
+                        Some(wotd.lemma)
+                    }else{
+                        None
+                    }
             }
-        };
+        } {
+            // Return the definition
+            if let Some(result) = self.get_exact(&lemma).await {
+                return Ok(result.definition);
+            }
+        }
 
-        // Return the definition
-        self.get_exact(&lemma).await.unwrap().definition
+        Err("Error obtaining word of the day")
     }
 }
 
@@ -161,7 +171,10 @@ impl DatabaseHandler {
             .filter(user::Column::Id.eq(user_id))
             .one(&self.db)
             .await
-            .unwrap()
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                None
+            })
     }
 
     /// Get list of subscribed users
@@ -189,7 +202,9 @@ impl DatabaseHandler {
             let mut user: user::ActiveModel = user.into();
             user.subscribed = Set(subscribed);
             user.in_bot = Set(true);
-            user.update(&self.db).await.unwrap();
+            if let Err(x) = user.update(&self.db).await {
+                log::error!("Error accessing the database: {:?}", x);
+            }
         } else {
             let new_user = user::Model {
                 id: user_id,
@@ -199,7 +214,9 @@ impl DatabaseHandler {
                 admin: false,
             };
             let new_user: user::ActiveModel = new_user.into();
-            new_user.insert(&self.db).await.unwrap();
+            if let Err(x) = new_user.insert(&self.db).await {
+                log::error!("Error accessing the database: {:?}", x);
+            }
         }
     }
 
@@ -210,7 +227,9 @@ impl DatabaseHandler {
         if let Some(user) = self.get_user(user_id).await {
             let mut user: user::ActiveModel = user.into();
             user.blocked = Set(blocked);
-            user.update(&self.db).await.unwrap();
+            if let Err(x) = user.update(&self.db).await {
+                log::error!("Error accessing the database: {:?}", x);
+            }
         }
     }
 
@@ -219,7 +238,9 @@ impl DatabaseHandler {
         if let Some(user) = self.get_user(user_id).await {
             let mut user: user::ActiveModel = user.into();
             user.in_bot = Set(in_bot);
-            user.update(&self.db).await.unwrap();
+            if let Err(x) = user.update(&self.db).await {
+                log::error!("Error accessing the database: {:?}", x);
+            }
         }
     }
 
@@ -229,7 +250,9 @@ impl DatabaseHandler {
         if let Some(user) = self.get_user(user_id).await {
             let mut user: user::ActiveModel = user.into();
             user.admin = Set(admin);
-            user.update(&self.db).await.unwrap();
+            if let Err(x) = user.update(&self.db).await {
+                log::error!("Error accessing the database: {:?}", x);
+            }
         }
     }
 }

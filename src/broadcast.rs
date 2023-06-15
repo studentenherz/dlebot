@@ -28,10 +28,9 @@ pub async fn broadcast_word_of_the_day(
     db_handler: DatabaseHandler,
     bot: DLEBot,
 ) -> ResponseResult<()> {
-    broadcast(
-        db_handler.get_word_of_the_day().await,
-        db_handler.get_subscribed_and_in_bot_list().await,
-        bot,
-    )
-    .await
+    if let Ok(wotd) = db_handler.get_word_of_the_day().await {
+        broadcast(wotd, db_handler.get_subscribed_and_in_bot_list().await, bot).await?;
+    }
+
+    Ok(())
 }
