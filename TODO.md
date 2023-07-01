@@ -1,6 +1,6 @@
 ## ToDo
 
--   [ ] Reproduce bot in Rust
+-   [x] Reproduce bot in Rust
 
     -   [x] Learn how to handle updates
     -   [x] Handle commands that don't require database connection
@@ -12,19 +12,18 @@
         -   [x] Create migrations
         -   [x] Connect to database
         -   [x] Models
-        -   [ ] Handlers
+        -   [x] Handlers
             -   [x] Dictionary
                 -   [x] `get_list` -> `get_list_like`
                 -   [x] `get_definition` -> `get_exact`
                 -   [x] `get_random`
                 -   [x] `get_word_of_the_day`
             -   [ ] Usage
-                -   [ ] Events
+                -   [x] Events
                     -   [x] Create migrations and models
                     -   [x] Handle the events
-                -   [ ] Users
+                -   [x] Users
                     -   [x] Create migrations and models
-                    -   [ ] Handle users
     -   [x] Find definition form message
     -   [x] Implement smart split of long messages
     -   [x] Implement commands related to DB
@@ -34,7 +33,7 @@
     -   [x] Implement inline handler
     -   [x] Implement schedule
 
-    -   [ ] Handler possible errors
+    -   [x] Handler possible errors
 
 #### New features
 
