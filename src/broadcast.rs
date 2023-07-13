@@ -3,13 +3,8 @@ use teloxide::prelude::*;
 use crate::{database::DatabaseHandler, DLEBot};
 
 async fn broadcast(message: String, users: Vec<i64>, bot: DLEBot) -> ResponseResult<()> {
-    async fn send_message(user_id: i64, bot: DLEBot, wotd: String) -> ResponseResult<()> {
-        bot.send_message(
-            ChatId(user_id),
-            format!("📖 Palabra del día\n\n {}", wotd.clone().trim()),
-        )
-        .await?;
-
+    async fn send_message(user_id: i64, bot: DLEBot, message: String) -> ResponseResult<()> {
+        bot.send_message(ChatId(user_id), message).await?;
         Ok(())
     }
 
@@ -29,7 +24,12 @@ pub async fn broadcast_word_of_the_day(
     bot: DLEBot,
 ) -> ResponseResult<()> {
     if let Ok(wotd) = db_handler.get_word_of_the_day().await {
-        broadcast(wotd, db_handler.get_subscribed_and_in_bot_list().await, bot).await?;
+        broadcast(
+            format!("📖 Palabra del día\n\n {}", wotd.clone().trim()),
+            db_handler.get_subscribed_and_in_bot_list().await,
+            bot,
+        )
+        .await?;
     }
 
     Ok(())
