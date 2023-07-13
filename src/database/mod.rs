@@ -6,7 +6,7 @@ use sea_orm::{
 };
 use std::env;
 
-use chrono::offset::Local;
+use chrono::{offset::Local, TimeZone};
 use schema::{
     dle::Model as DleModel,
     event,
@@ -14,6 +14,8 @@ use schema::{
     sea_orm_active_enums::EventType,
     user, word_of_the_day,
 };
+
+use crate::utils::MAX_WOTD_LENGTH;
 
 #[derive(Clone)]
 pub struct DatabaseHandler {
@@ -110,7 +112,7 @@ impl DatabaseHandler {
         let today = Local::now().date_naive();
 
         // Get a word that has today's date
-        if let Some(lemma) = match WordOfTheDay::find()
+        match WordOfTheDay::find()
             .from_raw_sql(Statement::from_sql_and_values(
                 DbBackend::Postgres,
                 r#"SELECT * FROM "word_of_the_day" WHERE "date" = $1 LIMIT 1"#,
@@ -122,10 +124,16 @@ impl DatabaseHandler {
                 log::error!("Error accessing the database: {:?}", x);
                 None
             }) {
-            Some(word_of_the_day::Model { lemma, .. }) => Some(lemma),
+            Some(word_of_the_day::Model { lemma, .. }) => {
+                if let Some(result) = self.get_exact(&lemma).await {
+                    return Ok(result.definition);
+                }
+            }
             None => {
-                // Get a random word that hasn't been WOTD
-                if let Some(wotd) = WordOfTheDay::find()
+                // Try 10 times until a definition short enough is found
+                for _ in 0..10 {
+                    // Get a random word that hasn't been WOTD
+                    if let Some(wotd) = WordOfTheDay::find()
                     .from_raw_sql(Statement::from_string(
                         DbBackend::Postgres,
                         r#"SELECT * FROM "word_of_the_day" WHERE "date" IS NULL ORDER BY RANDOM() LIMIT 1"#
@@ -137,9 +145,22 @@ impl DatabaseHandler {
                         log::error!("Error accessing the database: {:?}", x);
                         None
                     }){
-                        // Set it to used today
                         let mut active_wotd: word_of_the_day::ActiveModel = wotd.clone().into();
-                        active_wotd.date = Set(Some(today));
+                        let mut definition = None;
+
+                        if let Some(result) = self.get_exact(&wotd.lemma).await {
+                            if result.definition.len() < MAX_WOTD_LENGTH {
+                                // Set it to used today
+                                active_wotd.date = Set(Some(today));
+                                definition = Some(result.definition);
+                            }
+                            else{
+                                // Set it to used in a far past date
+                                active_wotd.date = Set(Some(Local.timestamp_millis_opt(0).unwrap().date_naive()));
+                            }
+                        }
+
+                        // Update the row
                         match active_wotd.update(&self.db).await {
                             Ok(_) => {}
                             Err(x) => {
@@ -147,15 +168,12 @@ impl DatabaseHandler {
                             }
                         }
 
-                        Some(wotd.lemma)
-                    }else{
-                        None
+                        // If the definition is small enough return it, else keep trying
+                        if let Some(def) = definition {
+                            return Ok(def);
+                        }
                     }
-            }
-        } {
-            // Return the definition
-            if let Some(result) = self.get_exact(&lemma).await {
-                return Ok(result.definition);
+                }
             }
         }
 
