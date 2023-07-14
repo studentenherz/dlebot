@@ -5,6 +5,7 @@ use teloxide::{
 };
 
 use crate::{
+    broadcast::broadcast_for_all,
     database::DatabaseHandler,
     utils::{
         base64_decode, base64_encode, smart_split, DESUBS_CALLBACK_DATA, MAX_MASSAGE_LENGTH,
@@ -28,6 +29,13 @@ enum Command {
     Pdd,
     #[command(description = "Suscribir a la «Palabra del día»")]
     Suscripcion,
+}
+
+#[derive(BotCommands, Clone)]
+#[command(rename_rule = "lowercase")]
+enum AdminCommand {
+    #[command(description = "Envía un mensaje a todos")]
+    Broadcast(String),
 }
 
 pub async fn set_commands(bot: DLEBot) -> ResponseResult<()> {
@@ -248,6 +256,16 @@ pub async fn handle_message(
                         .await;
 
                     if let Some(text) = msg.clone().text() {
+                        match BotCommands::parse(text, me.username()) {
+                            Ok(AdminCommand::Broadcast(message))
+                                if db_handler.is_admin(user_id).await =>
+                            {
+                                broadcast_for_all(message, db_handler, bot).await?;
+                                return Ok(());
+                            }
+                            _ => {}
+                        }
+
                         match BotCommands::parse(text, me.username()) {
                             Ok(Command::Start(start_parameter)) => {
                                 match base64_decode(start_parameter.clone()) {

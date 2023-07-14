@@ -195,6 +195,14 @@ impl DatabaseHandler {
             })
     }
 
+    /// Is admin?
+    pub async fn is_admin(&self, user_id: i64) -> bool {
+        self.get_user(user_id)
+            .await
+            .map(|user| user.admin)
+            .unwrap_or_default()
+    }
+
     /// Get list of subscribed users
     pub async fn get_subscribed_and_in_bot_list(&self) -> Vec<i64> {
         User::find()
