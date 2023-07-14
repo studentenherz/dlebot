@@ -214,6 +214,21 @@ impl DatabaseHandler {
             .collect()
     }
 
+    /// Get list of in-bot users
+    pub async fn get_in_bot_list(&self) -> Vec<i64> {
+        User::find()
+            .filter(user::Column::InBot.eq(true))
+            .all(&self.db)
+            .await
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                vec![]
+            })
+            .iter()
+            .map(|m| m.id)
+            .collect()
+    }
+
     /// Set subscribed status
     pub async fn set_subscribed(&self, user_id: i64, subscribed: bool) {
         if let Some(user) = self.get_user(user_id).await {

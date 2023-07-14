@@ -34,3 +34,13 @@ pub async fn broadcast_word_of_the_day(
 
     Ok(())
 }
+
+pub async fn broadcast_for_all(
+    message: String,
+    db_handler: DatabaseHandler,
+    bot: DLEBot,
+) -> ResponseResult<()> {
+    broadcast(message, db_handler.get_in_bot_list().await, bot).await?;
+
+    Ok(())
+}
