@@ -6,9 +6,9 @@ use rand::Rng;
 use tokio::time::{interval_at, Duration as StdDuration, Instant};
 use usvg::{fontdb, TreeParsing, TreeTextToPath};
 
-use crate::{database::DatabaseHandler, DLEBot};
+use crate::{database::DatabaseHandler, utils::base64_encode, DLEBot};
 
-const SECONDS_IN_A_DAY: u64 = 24 * 60 * 60;
+const SECONDS_IN_A_DAY: u64 = 10; // 24 * 60 * 60;
 const BG_COLORS_LENGTH: usize = 8;
 const LIGHT_BG_COLORS: [&str; BG_COLORS_LENGTH] = [
     "#f9b5b5", "#9cf2dc", "#9becf2", "#6ab6e9", "#cabff9", "#dbb3ef", "#f2cdea", "#f99daf",
@@ -71,9 +71,40 @@ async fn send_word_of_the_day(
     bot: DLEBot,
     channel_id: i64,
 ) -> ResponseResult<()> {
-    if let Ok(image) = get_image("lemma", "etymology") {
-        bot.send_photo(ChatId(channel_id), InputFile::memory(image))
-            .await?;
+    if let Ok(wotd) = db_handler.get_word_of_the_day().await {
+        let mut split = wotd.trim_start().split('\n');
+        let lemma = split.next().unwrap().trim();
+        let etymology = split
+            .next()
+            .unwrap()
+            .trim()
+            .replace("<i>", r#"<tspan style="font-style:italic">"#)
+            .replace("<em>", r#"<tspan style="font-style:italic">"#)
+            .replace("<b>", r#"<tspan style="font-style:bold">"#)
+            .replace("<strong>", r#"<tspan style="font-style:bold">"#)
+            .replace("</i>", r#"</tspan>"#)
+            .replace("</em>", r#"</tspan>"#)
+            .replace("</b>", r#"</tspan>"#)
+            .replace("</strong>", r#"</tspan>"#);
+
+        let wotd = wotd.replacen(
+            lemma,
+            &format!(
+                r#"<a href="https://t.me/{}?start={}">{}</a>"#,
+                bot.get_me().await.unwrap().username(),
+                base64_encode(lemma.to_string()),
+                lemma
+            ),
+            1,
+        );
+
+        println!("{}", &etymology);
+
+        if let Ok(image) = get_image(lemma, &etymology) {
+            bot.send_photo(ChatId(channel_id), InputFile::memory(image))
+                .caption(wotd)
+                .await?;
+        }
     }
 
     Ok(())
