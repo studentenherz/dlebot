@@ -102,10 +102,10 @@ async fn send_word_of_the_day(
     bot: DLEBot,
     msg: Message,
 ) -> ResponseResult<()> {
-    if let Ok(definition) = db_handler.get_word_of_the_day().await {
+    if let Ok(wotd) = db_handler.get_word_of_the_day().await {
         bot.send_message(
             msg.chat.id,
-            format!("📖 Palabra del día\n\n {}", definition.trim()),
+            format!("📖 Palabra del día\n\n {}", wotd.definition.trim()),
         )
         .await?;
     }

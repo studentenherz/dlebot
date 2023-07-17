@@ -72,7 +72,7 @@ async fn send_word_of_the_day(
     channel_id: i64,
 ) -> ResponseResult<()> {
     if let Ok(wotd) = db_handler.get_word_of_the_day().await {
-        let mut split = wotd.trim_start().split('\n');
+        let mut split = wotd.definition.trim_start().split('\n');
         let lemma = split.next().unwrap().trim();
         let mut etymology = split.next().unwrap().trim();
         if etymology.is_empty() {
@@ -89,22 +89,20 @@ async fn send_word_of_the_day(
             .replace("</b>", r#"</tspan>"#)
             .replace("</strong>", r#"</tspan>"#);
 
-        let wotd = wotd.replacen(
+        let definition = wotd.definition.replacen(
             lemma,
             &format!(
                 r#"<a href="https://t.me/{}?start={}">{}</a>"#,
                 bot.get_me().await.unwrap().username(),
-                base64_encode(lemma.to_string()),
+                base64_encode(wotd.lemma.to_string()),
                 lemma
             ),
             1,
         );
 
-        println!("{}", &etymology);
-
         if let Ok(image) = get_image(lemma, &etymology) {
             bot.send_photo(ChatId(channel_id), InputFile::memory(image))
-                .caption(wotd)
+                .caption(definition)
                 .await?;
         }
     }

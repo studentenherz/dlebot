@@ -108,7 +108,7 @@ impl DatabaseHandler {
     }
 
     /// Get word of the day: select a random word that hasn't been WOTD and returns it
-    pub async fn get_word_of_the_day(&self) -> Result<String, &'static str> {
+    pub async fn get_word_of_the_day(&self) -> Result<DleModel, &'static str> {
         let today = Local::now().date_naive();
 
         // Get a word that has today's date
@@ -126,7 +126,7 @@ impl DatabaseHandler {
             }) {
             Some(word_of_the_day::Model { lemma, .. }) => {
                 if let Some(result) = self.get_exact(&lemma).await {
-                    return Ok(result.definition);
+                    return Ok(result);
                 }
             }
             None => {
@@ -146,13 +146,13 @@ impl DatabaseHandler {
                         None
                     }){
                         let mut active_wotd: word_of_the_day::ActiveModel = wotd.clone().into();
-                        let mut definition = None;
+                        let mut wotd_model = None;
 
                         if let Some(result) = self.get_exact(&wotd.lemma).await {
                             if result.definition.len() < MAX_WOTD_LENGTH {
                                 // Set it to used today
                                 active_wotd.date = Set(Some(today));
-                                definition = Some(result.definition);
+                                wotd_model = Some(result);
                             }
                             else{
                                 // Set it to used in a far past date
@@ -169,8 +169,8 @@ impl DatabaseHandler {
                         }
 
                         // If the definition is small enough return it, else keep trying
-                        if let Some(def) = definition {
-                            return Ok(def);
+                        if let Some(model) = wotd_model {
+                            return Ok(model);
                         }
                     }
                 }
