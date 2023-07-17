@@ -74,10 +74,12 @@ async fn send_word_of_the_day(
     if let Ok(wotd) = db_handler.get_word_of_the_day().await {
         let mut split = wotd.trim_start().split('\n');
         let lemma = split.next().unwrap().trim();
-        let etymology = split
-            .next()
-            .unwrap()
-            .trim()
+        let mut etymology = split.next().unwrap().trim();
+        if etymology.is_empty() {
+            etymology = split.next().unwrap().trim();
+        }
+
+        let etymology = etymology
             .replace("<i>", r#"<tspan style="font-style:italic">"#)
             .replace("<em>", r#"<tspan style="font-style:italic">"#)
             .replace("<b>", r#"<tspan style="font-style:bold">"#)
