@@ -4,7 +4,6 @@ mod handle_callback_query;
 mod handle_chat_member;
 mod handle_inline;
 mod handle_message;
-mod scheduler;
 mod utils;
 mod word_of_the_day;
 
@@ -16,7 +15,7 @@ use handle_callback_query::handle_callback_query;
 use handle_chat_member::handle_my_chat_member;
 use handle_inline::{handle_chosen_inline_result, handle_inline};
 use handle_message::{handle_edited_message, handle_message, set_commands};
-use scheduler::schedule_word_of_the_day;
+use word_of_the_day::schedule_word_of_the_day;
 
 pub type DLEBot = DefaultParseMode<Bot>;
 
@@ -27,6 +26,16 @@ async fn main() -> ResponseResult<()> {
     let db_handler = DatabaseHandler::from_env().await;
 
     pretty_env_logger::init();
+
+    let schedule_hour = std::env::var("SCHEDULE_HOUR")
+        .unwrap()
+        .parse::<u32>()
+        .unwrap();
+
+    let schedule_min = std::env::var("SCHEDULE_MIN")
+        .unwrap()
+        .parse::<u32>()
+        .unwrap();
 
     let api_url = std::env::var("TELEGRAM_BOT_API_URL").unwrap();
     let api_url = reqwest::Url::parse(&api_url).unwrap();
@@ -54,8 +63,8 @@ async fn main() -> ResponseResult<()> {
     let scheduler_handle = tokio::spawn(schedule_word_of_the_day(
         db_handler.clone(),
         bot.clone(),
-        12,
-        00,
+        schedule_hour,
+        schedule_min,
     ));
 
     let handler = dptree::entry()
