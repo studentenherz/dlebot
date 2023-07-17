@@ -6,6 +6,7 @@ mod handle_inline;
 mod handle_message;
 mod scheduler;
 mod utils;
+mod word_of_the_day;
 
 use dotenvy::dotenv;
 use teloxide::{adaptors::DefaultParseMode, prelude::*, update_listeners::webhooks};

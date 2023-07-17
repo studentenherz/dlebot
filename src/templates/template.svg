@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="640"
+   height="360"
+   viewBox="0 0 169.33333 95.25"
+   version="1.1"
+   id="svg5"
+   xml:space="preserve"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+
+    <rect
+       style="fill:{bg_color};fill-opacity:1;stroke-width:0"
+       id="background"
+       width="169.33333"
+       height="95.25"
+       x="0"
+       y="0"
+    />
+
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:16.9333px;fill:{font_color};fill-opacity:1;stroke:none;stroke-width:0.5"
+       x="10"
+       y="40"
+       id="lemma">{lemma}
+    </text>
+
+    <text
+       xml:space="preserve"
+       style="font-size:4.23333px;white-space:pre;inline-size:100;display:inline;fill:{font_color};fill-opacity:0.7;stroke:none;stroke-width:0.5"
+       x="10"
+       y="52"
+       id="etymology">{etymology}
+    </text>
+
+    <path
+       d="m 9.595041,85.458077 c 1.834634,-0.8071 4.208796,-1.79113 4.536514,-1.92733 0.859655,-0.35647 1.123435,-0.28816 0.99191,0.50128 -0.09445,0.56742 -0.366985,2.44599 -0.584198,3.61526 -0.128897,0.69339 -0.418077,0.77557 -0.872794,0.47559 -0.218673,-0.14437 -1.322401,-0.87425 -1.561948,-1.04563 -0.218673,-0.15619 -0.520261,-0.34407 -0.142036,-0.71412 0.134591,-0.13181 1.016873,-0.97424 1.704276,-1.62997 0.09007,-0.0861 -0.02306,-0.22758 -0.126999,-0.15853 -0.926514,0.61441 -2.211107,1.46721 -2.3746,1.5783 -0.246993,0.16772 -0.484204,0.24465 -0.910018,0.12233 -0.321733,-0.0924 -0.636021,-0.20262 -0.758349,-0.24466 -0.471066,-0.16174 -0.359248,-0.37122 0.09824,-0.57252 z"
+       id="icon"
+       style="fill:{font_color}"
+    />
+
+    <text
+       xml:space="preserve"
+       style="font-size:4.23333px;white-space:pre;inline-size:57.8534;display:inline;fill:{font_color};fill-opacity:1;stroke:none;stroke-width:0.5"
+       x="17"
+       y="86.941924"
+       id="signature"><tspan
+           fill-opacity="0.7">t.me/</tspan>BuenIdioma <tspan fill-opacity="0.7">vía</tspan> @dlebot
+    </text>
+
+    <text
+       xml:space="preserve"
+       style="font-size:4.23333px;white-space:pre;inline-size:184.937;display:inline;fill:{font_color};fill-opacity:1;stroke:none;stroke-width:0.5"
+       x="140"
+       y="86.941924"
+       id="date">{date}
+    </text>
+</svg>
