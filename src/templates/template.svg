@@ -22,7 +22,7 @@
 
     <text
        xml:space="preserve"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:16.9333px;fill:{font_color};fill-opacity:1;stroke:none;stroke-width:0.5"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:{font_size_big}px;fill:{font_color};fill-opacity:1;stroke:none;stroke-width:0.5"
        x="10"
        y="40"
        id="lemma">{lemma}
@@ -30,7 +30,7 @@
 
     <text
        xml:space="preserve"
-       style="font-size:4.23333px;white-space:pre;inline-size:100;display:inline;fill:{font_color};fill-opacity:0.7;stroke:none;stroke-width:0.5"
+       style="font-size:{font_size_normal}px;white-space:pre;inline-size:100;display:inline;fill:{font_color};fill-opacity:0.7;stroke:none;stroke-width:0.5"
        x="10"
        y="52"
        id="etymology">{etymology}
@@ -44,7 +44,7 @@
 
     <text
        xml:space="preserve"
-       style="font-size:4.23333px;white-space:pre;inline-size:57.8534;display:inline;fill:{font_color};fill-opacity:1;stroke:none;stroke-width:0.5"
+       style="font-size:{font_size_normal}px;white-space:pre;inline-size:57.8534;display:inline;fill:{font_color};fill-opacity:1;stroke:none;stroke-width:0.5"
        x="17"
        y="86.941924"
        id="signature">{channel}<tspan fill-opacity="0.7">vía</tspan> @dlebot
@@ -52,7 +52,7 @@
 
     <text
        xml:space="preserve"
-       style="font-size:4.23333px;white-space:pre;inline-size:184.937;display:inline;fill:{font_color};fill-opacity:1;stroke:none;stroke-width:0.5"
+       style="font-size:{font_size_normal}px;white-space:pre;inline-size:184.937;display:inline;fill:{font_color};fill-opacity:1;stroke:none;stroke-width:0.5"
        x="140"
        y="86.941924"
        id="date">{date}

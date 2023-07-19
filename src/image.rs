@@ -21,7 +21,9 @@ const DARK_BG_COLORS: [&str; BG_COLORS_LENGTH] = [
 
 const MAX_CHARACTERS_IN_LINE: usize = 76;
 const INTERLINE_SPACING: f64 = 1.25;
-const FONT_SIZE: f64 = 4.23333;
+const FONT_SCALE: f64 = 0.9;
+const FONT_SIZE_NORMAL: f64 = 5.0 * FONT_SCALE;
+const FONT_SIZE_BIG: f64 = 20.0 * FONT_SCALE;
 
 fn get_image(lemma: &str, etymology: &str, channel: &str) -> Result<Vec<u8>, png::EncodingError> {
     let mut rng = rand::thread_rng();
@@ -45,14 +47,16 @@ fn get_image(lemma: &str, etymology: &str, channel: &str) -> Result<Vec<u8>, png
         etymology = etymology,
         date = date,
         font_color = if dark_theme { "#ffffff" } else { "#000000" },
-        channel = channel
+        channel = channel,
+        font_size_normal = FONT_SIZE_NORMAL,
+        font_size_big = FONT_SIZE_BIG
     );
 
     // resvg::Tree own all the required data and does not require
     // the input file, usvg::Tree or anything else.
     let tree = {
         let opt = usvg::Options {
-            font_family: "Georgia".to_string(),
+            font_family: "Tinos".to_string(),
             ..Default::default()
         };
 
@@ -81,7 +85,7 @@ pub async fn send_image(word: DleModel, bot: DLEBot, chat_id: ChatId) -> Respons
         etymology = split.next().unwrap().trim();
     }
 
-    let dy = INTERLINE_SPACING * FONT_SIZE;
+    let dy = INTERLINE_SPACING * FONT_SIZE_NORMAL;
     let etymology_lines: Vec<String> = split_by_whitespace(etymology, MAX_CHARACTERS_IN_LINE)
         .iter()
         .map(|&line| {
