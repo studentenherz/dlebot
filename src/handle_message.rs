@@ -7,6 +7,7 @@ use teloxide::{
 use crate::{
     broadcast::broadcast_for_all,
     database::DatabaseHandler,
+    image::send_image,
     utils::{
         base64_decode, base64_encode, smart_split, DESUBS_CALLBACK_DATA, MAX_MASSAGE_LENGTH,
         SUBS_CALLBACK_DATA,
@@ -36,6 +37,8 @@ enum Command {
 enum AdminCommand {
     #[command(description = "Envía un mensaje a todos")]
     Broadcast(String),
+    #[command(description = "Envía definición con una imagen")]
+    Image(String),
 }
 
 pub async fn set_commands(bot: DLEBot) -> ResponseResult<()> {
@@ -261,6 +264,21 @@ pub async fn handle_message(
                                 if db_handler.is_admin(user_id).await =>
                             {
                                 broadcast_for_all(message, db_handler, bot).await?;
+                                return Ok(());
+                            }
+                            Ok(AdminCommand::Image(lemma))
+                                if db_handler.is_admin(user_id).await =>
+                            {
+                                if let Some(word) = db_handler.get_exact(&lemma).await {
+                                    send_image(word, bot, ChatId(user_id)).await?;
+                                } else {
+                                    bot.send_message(
+                                        ChatId(user_id),
+                                        format!("No encontré {}", lemma),
+                                    )
+                                    .await?;
+                                }
+
                                 return Ok(());
                             }
                             _ => {}

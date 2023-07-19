@@ -47,8 +47,7 @@
        style="font-size:4.23333px;white-space:pre;inline-size:57.8534;display:inline;fill:{font_color};fill-opacity:1;stroke:none;stroke-width:0.5"
        x="17"
        y="86.941924"
-       id="signature"><tspan
-           fill-opacity="0.7">t.me/</tspan>BuenIdioma <tspan fill-opacity="0.7">vía</tspan> @dlebot
+       id="signature">{channel}<tspan fill-opacity="0.7">vía</tspan> @dlebot
     </text>
 
     <text

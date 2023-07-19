@@ -23,7 +23,7 @@ const MAX_CHARACTERS_IN_LINE: usize = 76;
 const INTERLINE_SPACING: f64 = 1.25;
 const FONT_SIZE: f64 = 4.23333;
 
-fn get_image(lemma: &str, etymology: &str) -> Result<Vec<u8>, png::EncodingError> {
+fn get_image(lemma: &str, etymology: &str, channel: &str) -> Result<Vec<u8>, png::EncodingError> {
     let mut rng = rand::thread_rng();
 
     let bg_index = rng.gen_range(0..BG_COLORS_LENGTH);
@@ -44,7 +44,8 @@ fn get_image(lemma: &str, etymology: &str) -> Result<Vec<u8>, png::EncodingError
         lemma = lemma,
         etymology = etymology,
         date = date,
-        font_color = if dark_theme { "#ffffff" } else { "#000000" }
+        font_color = if dark_theme { "#ffffff" } else { "#000000" },
+        channel = channel
     );
 
     // resvg::Tree own all the required data and does not require
@@ -115,7 +116,16 @@ pub async fn send_image(word: DleModel, bot: DLEBot, chat_id: ChatId) -> Respons
         1,
     );
 
-    if let Ok(image) = get_image(lemma, &etymology) {
+    let mut channel = String::new();
+    if let Ok(chat) = bot.get_chat(chat_id).await {
+        if chat.is_channel() {
+            if let Some(username) = chat.username() {
+                channel = format!(r#"<tspan fill-opacity="0.7">t.me/</tspan>{}"#, username);
+            }
+        }
+    }
+
+    if let Ok(image) = get_image(lemma, &etymology, &channel) {
         bot.send_photo(chat_id, InputFile::memory(image))
             .caption(definition)
             .await?;
