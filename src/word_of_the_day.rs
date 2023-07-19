@@ -4,7 +4,7 @@ use tokio::time::{interval_at, Duration as StdDuration, Instant};
 
 use crate::{database::DatabaseHandler, image::send_image, DLEBot};
 
-const SECONDS_IN_A_DAY: u64 = 10; // 24 * 60 * 60;
+const SECONDS_IN_A_DAY: u64 = 24 * 60 * 60;
 
 async fn send_word_of_the_day(
     db_handler: DatabaseHandler,
