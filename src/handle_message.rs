@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use teloxide::{
     prelude::*,
     types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me},
@@ -39,6 +40,13 @@ enum AdminCommand {
     Broadcast(String),
     #[command(description = "Envía definición con una imagen")]
     Image(String),
+    #[command(
+        description = "Setea la palabra del día de una fecha",
+        parse_with = "split"
+    )]
+    SetPdd { lemma: String, date: String },
+    #[command(description = "Obtén la lista de palabras programadas")]
+    GetSchedule,
 }
 
 pub async fn set_commands(bot: DLEBot) -> ResponseResult<()> {
@@ -277,6 +285,67 @@ pub async fn handle_message(
                                         format!("No encontré {}", lemma),
                                     )
                                     .await?;
+                                }
+
+                                return Ok(());
+                            }
+                            Ok(AdminCommand::SetPdd { lemma, date })
+                                if db_handler.is_admin(user_id).await =>
+                            {
+                                if let Ok(date) = NaiveDate::parse_from_str(&date, "%d/%m/%Y") {
+                                    match db_handler.set_word_of_the_day(&lemma, date).await {
+                                        Ok(true) => {
+                                            bot.send_message(
+                                                msg.chat.id,
+                                                format!("✅ {}: {}", lemma, date),
+                                            )
+                                            .await?;
+                                        }
+                                        Ok(false) => {
+                                            bot.send_message(
+                                                msg.chat.id,
+                                                format!("No se encontró la palabra {}", lemma),
+                                            )
+                                            .await?;
+                                        }
+                                        Err(err) => {
+                                            bot.send_message(
+                                                msg.chat.id,
+                                                format!("Hubo un error accediendo a la base de datos: <pre>{}</pre>", err),
+                                            )
+                                            .await?;
+                                        }
+                                    }
+                                } else {
+                                    bot.send_message(msg.chat.id, "El formato de la fecha es <pre>%d/%m/%Y</pre> (por ejemplo: 17/7/1997)").await?;
+                                }
+
+                                return Ok(());
+                            }
+                            Ok(AdminCommand::GetSchedule) if db_handler.is_admin(user_id).await => {
+                                match db_handler.get_word_of_the_day_schedule().await {
+                                    Ok(schedule) => {
+                                        let mut text = String::new();
+                                        for wotd in schedule {
+                                            text += &format!(
+                                                "<pre>{}: {}</pre>\n",
+                                                wotd.date.unwrap_or_default(),
+                                                wotd.lemma
+                                            );
+                                        }
+
+                                        bot.send_message(msg.chat.id, text).await?;
+                                    }
+                                    Err(error) => {
+                                        bot.send_message(
+                                            msg.chat.id,
+                                            format!(
+                                                "Hubo un error con la base de datos: {}",
+                                                error
+                                            ),
+                                        )
+                                        .await?;
+                                    }
                                 }
 
                                 return Ok(());
