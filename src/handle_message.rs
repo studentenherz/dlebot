@@ -278,7 +278,7 @@ pub async fn handle_message(
                                 if db_handler.is_admin(user_id).await =>
                             {
                                 if let Some(word) = db_handler.get_exact(&lemma).await {
-                                    send_image(word, bot, ChatId(user_id)).await?;
+                                    send_image(word, bot, ChatId(user_id), false).await?;
                                 } else {
                                     bot.send_message(
                                         ChatId(user_id),

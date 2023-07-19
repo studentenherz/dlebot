@@ -37,8 +37,12 @@ fn get_image(lemma: &str, etymology: &str, channel: &str) -> Result<Vec<u8>, png
         LIGHT_BG_COLORS[bg_index]
     };
 
-    let date = Local::now();
-    let date = format!("{}/{}/{}", date.day(), date.month(), date.year());
+    let date = if channel.is_empty() {
+        "".to_string()
+    } else {
+        let date = Local::now();
+        format!("{}/{}/{}", date.day(), date.month(), date.year())
+    };
 
     let svg_str = format!(
         include_str!("templates/template.svg"),
@@ -77,7 +81,12 @@ fn get_image(lemma: &str, etymology: &str, channel: &str) -> Result<Vec<u8>, png
     pixmap.encode_png()
 }
 
-pub async fn send_image(word: DleModel, bot: DLEBot, chat_id: ChatId) -> ResponseResult<()> {
+pub async fn send_image(
+    word: DleModel,
+    bot: DLEBot,
+    chat_id: ChatId,
+    pdd: bool,
+) -> ResponseResult<()> {
     let mut split = word.definition.trim_start().split('\n');
     let lemma = split.next().unwrap().trim();
     let mut etymology = split.next().unwrap().trim();
@@ -131,7 +140,11 @@ pub async fn send_image(word: DleModel, bot: DLEBot, chat_id: ChatId) -> Respons
 
     if let Ok(image) = get_image(lemma, &etymology, &channel) {
         bot.send_photo(chat_id, InputFile::memory(image))
-            .caption(definition)
+            .caption(format!(
+                "{} {}",
+                if pdd { "📖 #PalabraDelDía |" } else { "" },
+                definition.trim()
+            ))
             .await?;
     }
 

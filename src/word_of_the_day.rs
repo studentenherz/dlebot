@@ -12,7 +12,7 @@ async fn send_word_of_the_day(
     chat_id: ChatId,
 ) -> ResponseResult<()> {
     if let Ok(wotd) = db_handler.get_word_of_the_day().await {
-        send_image(wotd, bot, chat_id).await?;
+        send_image(wotd, bot, chat_id, true).await?;
     }
 
     Ok(())
