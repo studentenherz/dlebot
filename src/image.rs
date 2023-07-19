@@ -120,7 +120,7 @@ pub async fn send_image(word: DleModel, bot: DLEBot, chat_id: ChatId) -> Respons
     if let Ok(chat) = bot.get_chat(chat_id).await {
         if chat.is_channel() {
             if let Some(username) = chat.username() {
-                channel = format!(r#"<tspan fill-opacity="0.7">t.me/</tspan>{}"#, username);
+                channel = format!(r#"<tspan fill-opacity="0.7">t.me/</tspan>{} "#, username);
             }
         }
     }
