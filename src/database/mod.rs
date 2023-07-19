@@ -1,12 +1,13 @@
 mod schema;
 
 use sea_orm::{
-    entity::prelude::DateTimeWithTimeZone, ActiveModelTrait, ColumnTrait, ConnectOptions, Database,
-    DatabaseConnection, DbBackend, EntityTrait, QueryFilter, Set, Statement,
+    entity::prelude::DateTimeWithTimeZone, sea_query::Expr, ActiveModelTrait, ColumnTrait,
+    ConnectOptions, Database, DatabaseConnection, DbBackend, DbErr, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, Statement, Value,
 };
 use std::env;
 
-use chrono::{offset::Local, TimeZone};
+use chrono::{offset::Local, NaiveDate, TimeZone};
 use schema::{
     event,
     prelude::{Dle, User, WordOfTheDay},
@@ -106,6 +107,43 @@ impl DatabaseHandler {
                 log::error!("Error accessing the database: {:?}", x);
                 None
             })
+    }
+
+    /// Set word of the day
+    pub async fn set_word_of_the_day(&self, lemma: &str, date: NaiveDate) -> Result<bool, DbErr> {
+        WordOfTheDay::update_many()
+            .col_expr(
+                word_of_the_day::Column::Date,
+                Expr::value(Value::ChronoDate(None)),
+            )
+            .filter(word_of_the_day::Column::Date.eq(date))
+            .exec(&self.db)
+            .await?;
+
+        if let Some(wotd) = WordOfTheDay::find()
+            .filter(word_of_the_day::Column::Lemma.eq(lemma))
+            .one(&self.db)
+            .await?
+        {
+            let mut active_wotd: word_of_the_day::ActiveModel = wotd.into();
+            active_wotd.date = Set(Some(date));
+            active_wotd.update(&self.db).await?;
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    // Get schedule
+    pub async fn get_word_of_the_day_schedule(&self) -> Result<Vec<word_of_the_day::Model>, DbErr> {
+        WordOfTheDay::find()
+            .limit(10)
+            .filter(word_of_the_day::Column::Date.is_not_null())
+            .filter(word_of_the_day::Column::Date.gte(Local::now().date_naive()))
+            .order_by_asc(word_of_the_day::Column::Date)
+            .all(&self.db)
+            .await
     }
 
     /// Get word of the day: select a random word that hasn't been WOTD and returns it
