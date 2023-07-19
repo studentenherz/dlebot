@@ -8,7 +8,6 @@ use std::env;
 
 use chrono::{offset::Local, TimeZone};
 use schema::{
-    dle::Model as DleModel,
     event,
     prelude::{Dle, User, WordOfTheDay},
     sea_orm_active_enums::EventType,
@@ -16,6 +15,8 @@ use schema::{
 };
 
 use crate::utils::MAX_WOTD_LENGTH;
+
+pub type DleModel = schema::dle::Model;
 
 #[derive(Clone)]
 pub struct DatabaseHandler {
