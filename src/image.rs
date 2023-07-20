@@ -81,6 +81,27 @@ fn get_image(lemma: &str, etymology: &str, channel: &str) -> Result<Vec<u8>, png
     pixmap.encode_png()
 }
 
+trait ConvertHtmlTagsToSvg {
+    fn convert_html_tags_to_svg(&self) -> String;
+}
+
+impl ConvertHtmlTagsToSvg for &str {
+    fn convert_html_tags_to_svg(&self) -> String {
+        self.replace("<i>", r#"<tspan style="font-style:italic">"#)
+            .replace("<em>", r#"<tspan style="font-style:italic">"#)
+            .replace("<b>", r#"<tspan style="font-weight:bold">"#)
+            .replace("<strong>", r#"<tspan style="font-weight:bold">"#)
+            .replace("<u>", r#"<tspan text-decoration="underline">"#)
+            .replace("<ins>", r#"<tspan text-decoration="underline">"#)
+            .replace("</i>", r#"</tspan>"#)
+            .replace("</em>", r#"</tspan>"#)
+            .replace("</b>", r#"</tspan>"#)
+            .replace("</strong>", r#"</tspan>"#)
+            .replace("</u>", r#"</tspan>"#)
+            .replace("</ins>", r#"</tspan>"#)
+    }
+}
+
 pub async fn send_image(
     word: DleModel,
     bot: DLEBot,
@@ -88,7 +109,7 @@ pub async fn send_image(
     pdd: bool,
 ) -> ResponseResult<()> {
     let mut split = word.definition.trim_start().split('\n');
-    let lemma = split.next().unwrap().trim();
+    let lemma = split.next().unwrap().trim().convert_html_tags_to_svg();
     let mut etymology = split.next().unwrap().trim();
     if etymology.is_empty() {
         etymology = split.next().unwrap().trim();
@@ -97,20 +118,7 @@ pub async fn send_image(
     let dy = INTERLINE_SPACING * FONT_SIZE_NORMAL;
     let etymology_lines: Vec<String> = split_by_whitespace(etymology, MAX_CHARACTERS_IN_LINE)
         .iter()
-        .map(|&line| {
-            line.replace("<i>", r#"<tspan style="font-style:italic">"#)
-                .replace("<em>", r#"<tspan style="font-style:italic">"#)
-                .replace("<b>", r#"<tspan style="font-style:bold">"#)
-                .replace("<strong>", r#"<tspan style="font-style:bold">"#)
-                .replace("<u>", r#"<tspan text-decoration="underline">"#)
-                .replace("<ins>", r#"<tspan text-decoration="underline">"#)
-                .replace("</i>", r#"</tspan>"#)
-                .replace("</em>", r#"</tspan>"#)
-                .replace("</b>", r#"</tspan>"#)
-                .replace("</strong>", r#"</tspan>"#)
-                .replace("</u>", r#"</tspan>"#)
-                .replace("</ins>", r#"</tspan>"#)
-        })
+        .map(|&line| line.convert_html_tags_to_svg())
         .collect();
 
     let mut etymology = String::new();
@@ -119,7 +127,7 @@ pub async fn send_image(
     }
 
     let definition = word.definition.replacen(
-        lemma,
+        &lemma,
         &format!(
             r#"<a href="https://t.me/{}?start={}">{}</a>"#,
             bot.get_me().await.unwrap().username(),
@@ -138,7 +146,7 @@ pub async fn send_image(
         }
     }
 
-    if let Ok(image) = get_image(lemma, &etymology, &channel) {
+    if let Ok(image) = get_image(&lemma, &etymology, &channel) {
         bot.send_photo(chat_id, InputFile::memory(image))
             .caption(format!(
                 "{} {}",
