@@ -42,14 +42,31 @@ pub fn smart_split(text: &str, chars_per_string: usize) -> Vec<&str> {
 pub fn split_by_whitespace(text: &str, chars_per_string: usize) -> Vec<&str> {
     let mut result: Vec<&str> = vec![];
     let mut left: usize = 0;
+    let mut last_space_pos: usize = 0;
+    let mut count: usize = 0;
 
-    while text.len() - left >= chars_per_string {
-        if let Some(pos) = text[left..(left + chars_per_string)].rfind(' ') {
-            result.push(&text[left..=(left + pos)]);
-            left += pos + 1;
-        } else {
-            result.push(&text[left..(left + chars_per_string)]);
-            left += chars_per_string;
+    let mut open = false;
+    for (i, c) in text.char_indices() {
+        if c == '<' {
+            open = true;
+        }
+
+        if !open {
+            count += 1;
+
+            if count > chars_per_string {
+                result.push(&text[left..=last_space_pos]);
+                left = last_space_pos + 1;
+                count = i - last_space_pos;
+            }
+
+            if c == ' ' {
+                last_space_pos = i;
+            }
+        }
+
+        if c == '>' {
+            open = false;
         }
     }
     result.push(&text[left..]);

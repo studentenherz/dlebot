@@ -3,6 +3,7 @@ use std::path::Path;
 use ::teloxide::{prelude::*, types::InputFile};
 use chrono::{offset::Local, Datelike};
 use rand::Rng;
+use regex::Regex;
 use usvg::{fontdb, TreeParsing, TreeTextToPath};
 
 use crate::{
@@ -19,7 +20,7 @@ const DARK_BG_COLORS: [&str; BG_COLORS_LENGTH] = [
     "#602323", "#187f65", "#1a5055", "#1a4563", "#312569", "#5b3171", "#633057", "#652e39",
 ];
 
-const MAX_CHARACTERS_IN_LINE: usize = 76;
+const MAX_CHARACTERS_IN_LINE: usize = 80;
 const INTERLINE_SPACING: f64 = 1.25;
 const FONT_SCALE: f64 = 0.9;
 const FONT_SIZE_NORMAL: f64 = 5.0 * FONT_SCALE;
@@ -102,6 +103,33 @@ impl ConvertHtmlTagsToSvg for &str {
     }
 }
 
+fn fix_tags(input: &mut [String]) {
+    let re = Regex::new(r#"(?P<open><tspan\s.+?>)|(?P<close></tspan>)"#).unwrap();
+    let mut carry = String::new();
+
+    for line in input.iter_mut() {
+        *line = format!("{}{}", carry, line);
+        let mut opening_tags: Vec<String> = vec![];
+        let mut opening_tags_count = 0;
+        let mut closing_tags_count = 0;
+        for capture in re.captures_iter(line) {
+            if capture.name("open").is_some() {
+                opening_tags_count += 1;
+                opening_tags.push(capture[0].into());
+            } else if capture.name("close").is_some() {
+                closing_tags_count += 1;
+            }
+        }
+        if opening_tags_count > closing_tags_count {
+            let diff = opening_tags_count - closing_tags_count;
+            *line = format!("{}{}", line, "</tspan>".repeat(diff));
+            carry = opening_tags[closing_tags_count..].join("");
+        } else {
+            carry.clear();
+        }
+    }
+}
+
 pub async fn send_image(
     word: DleModel,
     bot: DLEBot,
@@ -116,10 +144,11 @@ pub async fn send_image(
     }
 
     let dy = INTERLINE_SPACING * FONT_SIZE_NORMAL;
-    let etymology_lines: Vec<String> = split_by_whitespace(etymology, MAX_CHARACTERS_IN_LINE)
+    let mut etymology_lines: Vec<String> = split_by_whitespace(etymology, MAX_CHARACTERS_IN_LINE)
         .iter()
         .map(|&line| line.convert_html_tags_to_svg())
         .collect();
+    fix_tags(&mut etymology_lines);
 
     let mut etymology = String::new();
     for (i, line) in etymology_lines.iter().enumerate() {
