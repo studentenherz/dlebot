@@ -1,19 +1,23 @@
 mod schema;
 
 use sea_orm::{
-    entity::prelude::DateTimeWithTimeZone, ActiveModelTrait, ColumnTrait, ConnectOptions, Database,
-    DatabaseConnection, DbBackend, EntityTrait, QueryFilter, Set, Statement,
+    entity::prelude::DateTimeWithTimeZone, sea_query::Expr, ActiveModelTrait, ColumnTrait,
+    ConnectOptions, Database, DatabaseConnection, DbBackend, DbErr, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, Statement, Value,
 };
 use std::env;
 
-use chrono::offset::Local;
+use chrono::{offset::Local, NaiveDate, TimeZone};
 use schema::{
-    dle::Model as DleModel,
     event,
     prelude::{Dle, User, WordOfTheDay},
     sea_orm_active_enums::EventType,
     user, word_of_the_day,
 };
+
+use crate::utils::MAX_WOTD_LENGTH;
+
+pub type DleModel = schema::dle::Model;
 
 #[derive(Clone)]
 pub struct DatabaseHandler {
@@ -105,12 +109,49 @@ impl DatabaseHandler {
             })
     }
 
+    /// Set word of the day
+    pub async fn set_word_of_the_day(&self, lemma: &str, date: NaiveDate) -> Result<bool, DbErr> {
+        WordOfTheDay::update_many()
+            .col_expr(
+                word_of_the_day::Column::Date,
+                Expr::value(Value::ChronoDate(None)),
+            )
+            .filter(word_of_the_day::Column::Date.eq(date))
+            .exec(&self.db)
+            .await?;
+
+        if let Some(wotd) = WordOfTheDay::find()
+            .filter(word_of_the_day::Column::Lemma.eq(lemma))
+            .one(&self.db)
+            .await?
+        {
+            let mut active_wotd: word_of_the_day::ActiveModel = wotd.into();
+            active_wotd.date = Set(Some(date));
+            active_wotd.update(&self.db).await?;
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    // Get schedule
+    pub async fn get_word_of_the_day_schedule(&self) -> Result<Vec<word_of_the_day::Model>, DbErr> {
+        WordOfTheDay::find()
+            .limit(10)
+            .filter(word_of_the_day::Column::Date.is_not_null())
+            .filter(word_of_the_day::Column::Date.gte(Local::now().date_naive()))
+            .order_by_asc(word_of_the_day::Column::Date)
+            .all(&self.db)
+            .await
+    }
+
     /// Get word of the day: select a random word that hasn't been WOTD and returns it
-    pub async fn get_word_of_the_day(&self) -> Result<String, &'static str> {
+    pub async fn get_word_of_the_day(&self) -> Result<DleModel, &'static str> {
         let today = Local::now().date_naive();
 
         // Get a word that has today's date
-        if let Some(lemma) = match WordOfTheDay::find()
+        match WordOfTheDay::find()
             .from_raw_sql(Statement::from_sql_and_values(
                 DbBackend::Postgres,
                 r#"SELECT * FROM "word_of_the_day" WHERE "date" = $1 LIMIT 1"#,
@@ -122,10 +163,16 @@ impl DatabaseHandler {
                 log::error!("Error accessing the database: {:?}", x);
                 None
             }) {
-            Some(word_of_the_day::Model { lemma, .. }) => Some(lemma),
+            Some(word_of_the_day::Model { lemma, .. }) => {
+                if let Some(result) = self.get_exact(&lemma).await {
+                    return Ok(result);
+                }
+            }
             None => {
-                // Get a random word that hasn't been WOTD
-                if let Some(wotd) = WordOfTheDay::find()
+                // Try 10 times until a definition short enough is found
+                for _ in 0..10 {
+                    // Get a random word that hasn't been WOTD
+                    if let Some(wotd) = WordOfTheDay::find()
                     .from_raw_sql(Statement::from_string(
                         DbBackend::Postgres,
                         r#"SELECT * FROM "word_of_the_day" WHERE "date" IS NULL ORDER BY RANDOM() LIMIT 1"#
@@ -137,9 +184,22 @@ impl DatabaseHandler {
                         log::error!("Error accessing the database: {:?}", x);
                         None
                     }){
-                        // Set it to used today
                         let mut active_wotd: word_of_the_day::ActiveModel = wotd.clone().into();
-                        active_wotd.date = Set(Some(today));
+                        let mut wotd_model = None;
+
+                        if let Some(result) = self.get_exact(&wotd.lemma).await {
+                            if result.definition.len() < MAX_WOTD_LENGTH {
+                                // Set it to used today
+                                active_wotd.date = Set(Some(today));
+                                wotd_model = Some(result);
+                            }
+                            else{
+                                // Set it to used in a far past date
+                                active_wotd.date = Set(Some(Local.timestamp_millis_opt(0).unwrap().date_naive()));
+                            }
+                        }
+
+                        // Update the row
                         match active_wotd.update(&self.db).await {
                             Ok(_) => {}
                             Err(x) => {
@@ -147,15 +207,12 @@ impl DatabaseHandler {
                             }
                         }
 
-                        Some(wotd.lemma)
-                    }else{
-                        None
+                        // If the definition is small enough return it, else keep trying
+                        if let Some(model) = wotd_model {
+                            return Ok(model);
+                        }
                     }
-            }
-        } {
-            // Return the definition
-            if let Some(result) = self.get_exact(&lemma).await {
-                return Ok(result.definition);
+                }
             }
         }
 
@@ -177,14 +234,37 @@ impl DatabaseHandler {
             })
     }
 
+    /// Is admin?
+    pub async fn is_admin(&self, user_id: i64) -> bool {
+        self.get_user(user_id)
+            .await
+            .map(|user| user.admin)
+            .unwrap_or_default()
+    }
+
     /// Get list of subscribed users
-    pub async fn get_subscribed_and_in_bot_list(&self) -> Vec<i64> {
+    pub async fn _get_subscribed_and_in_bot_list(&self) -> Vec<i64> {
         User::find()
             .filter(
                 user::Column::Subscribed
                     .eq(true)
                     .and(user::Column::InBot.eq(true)),
             )
+            .all(&self.db)
+            .await
+            .unwrap_or_else(|x| {
+                log::error!("Error accessing the database: {:?}", x);
+                vec![]
+            })
+            .iter()
+            .map(|m| m.id)
+            .collect()
+    }
+
+    /// Get list of in-bot users
+    pub async fn get_in_bot_list(&self) -> Vec<i64> {
+        User::find()
+            .filter(user::Column::InBot.eq(true))
             .all(&self.db)
             .await
             .unwrap_or_else(|x| {

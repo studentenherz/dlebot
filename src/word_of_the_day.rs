@@ -1,11 +1,24 @@
-use chrono::{Duration, Local, Timelike};
+use ::teloxide::prelude::*;
+use chrono::{offset::Local, Duration, Timelike};
 use tokio::time::{interval_at, Duration as StdDuration, Instant};
 
-use crate::{broadcast::broadcast_word_of_the_day, database::DatabaseHandler, DLEBot};
+use crate::{database::DatabaseHandler, image::send_image, DLEBot};
 
 const SECONDS_IN_A_DAY: u64 = 24 * 60 * 60;
 
-/// Schedule the execution of `broadcast_word_of_the_day`
+async fn send_word_of_the_day(
+    db_handler: DatabaseHandler,
+    bot: DLEBot,
+    chat_id: ChatId,
+) -> ResponseResult<()> {
+    if let Ok(wotd) = db_handler.get_word_of_the_day().await {
+        send_image(wotd, bot, chat_id, true).await?;
+    }
+
+    Ok(())
+}
+
+/// Schedule the execution of `send_word_of_the_day`
 ///
 /// # Arguments
 ///
@@ -20,6 +33,11 @@ pub async fn schedule_word_of_the_day(
     hour: u32,
     min: u32,
 ) {
+    let channel_id = std::env::var("WOTD_CHANNEL_ID")
+        .unwrap()
+        .parse::<i64>()
+        .unwrap();
+
     let target_moment = Local::now()
         .with_hour(hour)
         .unwrap()
@@ -45,10 +63,10 @@ pub async fn schedule_word_of_the_day(
 
     loop {
         interval.tick().await;
-        broadcast_word_of_the_day(db_handler.clone(), bot.clone())
+        send_word_of_the_day(db_handler.clone(), bot.clone(), ChatId(channel_id))
             .await
-            .unwrap_or_else(|_| {
-                log::warn!("Error while broadcasting word of the day");
+            .unwrap_or_else(|error| {
+                log::warn!("Error while sending word of the day {:?}", error);
             });
     }
 }

@@ -5,6 +5,7 @@ use base64::{
 };
 
 pub const MAX_MASSAGE_LENGTH: usize = 4096;
+pub const MAX_WOTD_LENGTH: usize = 400;
 pub const SUBS_CALLBACK_DATA: &str = "__subs";
 pub const DESUBS_CALLBACK_DATA: &str = "__desubs";
 const CUSTOM_ENGINE: engine::GeneralPurpose =
@@ -29,6 +30,43 @@ pub fn smart_split(text: &str, chars_per_string: usize) -> Vec<&str> {
         } else {
             result.push(&text[left..(left + chars_per_string)]);
             left += chars_per_string;
+        }
+    }
+    result.push(&text[left..]);
+
+    result
+}
+
+/// Split one string into multiple strings with a maximum length of `chars_per_string`.
+/// Splits ' '
+pub fn split_by_whitespace(text: &str, chars_per_string: usize) -> Vec<&str> {
+    let mut result: Vec<&str> = vec![];
+    let mut left: usize = 0;
+    let mut last_space_pos: usize = 0;
+    let mut count: usize = 0;
+
+    let mut open = false;
+    for (i, c) in text.char_indices() {
+        if c == '<' {
+            open = true;
+        }
+
+        if !open {
+            count += 1;
+
+            if count > chars_per_string {
+                result.push(&text[left..=last_space_pos]);
+                left = last_space_pos + 1;
+                count = i - last_space_pos;
+            }
+
+            if c == ' ' {
+                last_space_pos = i;
+            }
+        }
+
+        if c == '>' {
+            open = false;
         }
     }
     result.push(&text[left..]);

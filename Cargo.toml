@@ -26,3 +26,8 @@ sea-orm = { version = "0.11.3", features = [
 reqwest = "0.11.18"
 chrono = "0.4.26"
 base64 = "0.21.2"
+usvg = "0.35.0"
+resvg = "0.35.0"
+rand = "0.8.5"
+png = "0.17.9"
+regex = "1.9.1"
