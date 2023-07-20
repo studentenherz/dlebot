@@ -2,7 +2,7 @@ use chrono::NaiveDate;
 use teloxide::{
     prelude::*,
     types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me},
-    utils::command::BotCommands,
+    utils::command::{BotCommands, ParseError},
 };
 
 use crate::{
@@ -28,6 +28,19 @@ enum Command {
     Pdd,
 }
 
+fn split_by_first_whitespace(text: String) -> Result<(String, String), ParseError> {
+    let split: Vec<&str> = text.split(' ').collect();
+    if split.len() >= 2 {
+        return Ok((split[0].to_string(), split[1..].join(" ")));
+    }
+
+    Err(ParseError::TooFewArguments {
+        expected: 2,
+        found: 1,
+        message: "/command arg1 arg2".to_string(),
+    })
+}
+
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
 enum AdminCommand {
@@ -37,7 +50,7 @@ enum AdminCommand {
     Image(String),
     #[command(
         description = "Setea la palabra del día de una fecha",
-        parse_with = "split"
+        parse_with = split_by_first_whitespace
     )]
     SetPdd { date: String, lemma: String },
     #[command(description = "Obtén la lista de palabras programadas")]
