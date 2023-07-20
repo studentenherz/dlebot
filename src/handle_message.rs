@@ -9,10 +9,7 @@ use crate::{
     broadcast::broadcast_for_all,
     database::DatabaseHandler,
     image::send_image,
-    utils::{
-        base64_decode, base64_encode, smart_split, DESUBS_CALLBACK_DATA, MAX_MASSAGE_LENGTH,
-        SUBS_CALLBACK_DATA,
-    },
+    utils::{base64_decode, base64_encode, smart_split, MAX_MASSAGE_LENGTH},
     DLEBot,
 };
 
@@ -29,8 +26,6 @@ enum Command {
     Aleatorio,
     #[command(description = "Mostrar la «Palabra del día»")]
     Pdd,
-    #[command(description = "Suscribir a la «Palabra del día»")]
-    Suscripcion,
 }
 
 #[derive(BotCommands, Clone)]
@@ -44,7 +39,7 @@ enum AdminCommand {
         description = "Setea la palabra del día de una fecha",
         parse_with = "split"
     )]
-    SetPdd { lemma: String, date: String },
+    SetPdd { date: String, lemma: String },
     #[command(description = "Obtén la lista de palabras programadas")]
     GetSchedule,
 }
@@ -57,20 +52,14 @@ pub async fn set_commands(bot: DLEBot) -> ResponseResult<()> {
 
 const KEY_RANDOM: &str = "🎲 Palabra aleatoria";
 const KEY_WOTD: &str = "📖 Palabra del día";
-const KEY_SUBSCRIPTION: &str = "🔔 Suscripción";
 const KEY_HELP: &str = "❔ Ayuda";
 
 async fn send_start(bot: DLEBot, msg: Message) -> ResponseResult<()> {
-    let keyboard = KeyboardMarkup::new([
-        [
-            KeyboardButton::new(KEY_RANDOM),
-            KeyboardButton::new(KEY_WOTD),
-        ],
-        [
-            KeyboardButton::new(KEY_SUBSCRIPTION),
-            KeyboardButton::new(KEY_HELP),
-        ],
-    ])
+    let keyboard = KeyboardMarkup::new([[
+        KeyboardButton::new(KEY_RANDOM),
+        KeyboardButton::new(KEY_WOTD),
+    ]])
+    .append_row([KeyboardButton::new(KEY_HELP)])
     .resize_keyboard(true);
 
     bot.send_message(msg.chat.id, include_str!("templates/start.txt"))
@@ -120,45 +109,6 @@ async fn send_word_of_the_day(
         )
         .await?;
     }
-
-    Ok(())
-}
-
-async fn send_subscription(
-    db_handler: DatabaseHandler,
-    bot: DLEBot,
-    msg: Message,
-    user_id: i64,
-    user_first_name: String,
-) -> ResponseResult<()> {
-    let subscribed = match db_handler.get_user(user_id).await {
-        Some(user) => user.subscribed,
-        None => false,
-    };
-
-    let inline_keyboard = InlineKeyboardMarkup::new([[InlineKeyboardButton::callback(
-        if subscribed {
-            "Desuscribirme"
-        } else {
-            "¡Suscribirme!"
-        },
-        if subscribed {
-            DESUBS_CALLBACK_DATA
-        } else {
-            SUBS_CALLBACK_DATA
-        },
-    )]]);
-
-    bot.send_message(
-        msg.chat.id,
-        format!(
-            include_str!("templates/subscription.txt"),
-            user_first_name,
-            if subscribed { "SÍ" } else { "NO" }
-        ),
-    )
-    .reply_markup(inline_keyboard)
-    .await?;
 
     Ok(())
 }
@@ -289,7 +239,7 @@ pub async fn handle_message(
 
                                 return Ok(());
                             }
-                            Ok(AdminCommand::SetPdd { lemma, date })
+                            Ok(AdminCommand::SetPdd { date, lemma })
                                 if db_handler.is_admin(user_id).await =>
                             {
                                 if let Ok(date) = NaiveDate::parse_from_str(&date, "%d/%m/%Y") {
@@ -389,33 +339,12 @@ pub async fn handle_message(
                                 send_word_of_the_day(db_handler, bot, msg).await?;
                             }
 
-                            Ok(Command::Suscripcion) => {
-                                send_subscription(
-                                    db_handler,
-                                    bot,
-                                    msg,
-                                    user_id,
-                                    user.first_name.clone(),
-                                )
-                                .await?;
-                            }
-
                             Err(_) => match text {
                                 KEY_RANDOM => {
                                     send_random(db_handler, bot, msg).await?;
                                 }
                                 KEY_HELP => {
                                     send_help(bot, msg, me).await?;
-                                }
-                                KEY_SUBSCRIPTION => {
-                                    send_subscription(
-                                        db_handler,
-                                        bot,
-                                        msg,
-                                        user_id,
-                                        user.first_name.clone(),
-                                    )
-                                    .await?;
                                 }
                                 KEY_WOTD => {
                                     send_word_of_the_day(db_handler, bot, msg).await?;
