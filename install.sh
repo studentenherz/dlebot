@@ -12,6 +12,7 @@ After=network.target
 [Service]
 User=$(whoami)
 WorkingDirectory=${wdir}
+Restart=on-failure
 ExecStart=${wdir}/target/release/dlebot
 
 [Install]
