@@ -168,9 +168,12 @@ pub async fn send_image(
 
     let mut channel = String::new();
     if let Ok(chat) = bot.get_chat(chat_id).await {
+        log::info!("Chat: {:?}", chat);
         if chat.is_channel() {
             if let Some(username) = chat.username() {
+                log::info!("Channel username: {}", username);
                 channel = format!(r#"<tspan fill-opacity="0.7">t.me/</tspan>{} "#, username);
+                log::info!("Channel: {}", channel);
             }
         }
     }
