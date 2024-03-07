@@ -7,15 +7,13 @@ use sea_orm::{
 };
 use std::env;
 
-use chrono::{offset::Local, NaiveDate, TimeZone};
+use chrono::{offset::Local, NaiveDate};
 use schema::{
     event,
     prelude::{Dle, User, WordOfTheDay},
     sea_orm_active_enums::EventType,
     user, word_of_the_day,
 };
-
-use crate::utils::MAX_WOTD_LENGTH;
 
 pub type DleModel = schema::dle::Model;
 
@@ -168,52 +166,7 @@ impl DatabaseHandler {
                     return Ok(result);
                 }
             }
-            None => {
-                // Try 10 times until a definition short enough is found
-                for _ in 0..10 {
-                    // Get a random word that hasn't been WOTD
-                    if let Some(wotd) = WordOfTheDay::find()
-                    .from_raw_sql(Statement::from_string(
-                        DbBackend::Postgres,
-                        r#"SELECT * FROM "word_of_the_day" WHERE "date" IS NULL ORDER BY RANDOM() LIMIT 1"#
-                            .to_string(),
-                    ))
-                    .one(&self.db)
-                    .await
-                    .unwrap_or_else(|x| {
-                        log::error!("Error accessing the database: {:?}", x);
-                        None
-                    }){
-                        let mut active_wotd: word_of_the_day::ActiveModel = wotd.clone().into();
-                        let mut wotd_model = None;
-
-                        if let Some(result) = self.get_exact(&wotd.lemma).await {
-                            if result.definition.len() < MAX_WOTD_LENGTH {
-                                // Set it to used today
-                                active_wotd.date = Set(Some(today));
-                                wotd_model = Some(result);
-                            }
-                            else{
-                                // Set it to used in a far past date
-                                active_wotd.date = Set(Some(Local.timestamp_millis_opt(0).unwrap().date_naive()));
-                            }
-                        }
-
-                        // Update the row
-                        match active_wotd.update(&self.db).await {
-                            Ok(_) => {}
-                            Err(x) => {
-                                log::error!("Error accessing the database: {:?}", x);
-                            }
-                        }
-
-                        // If the definition is small enough return it, else keep trying
-                        if let Some(model) = wotd_model {
-                            return Ok(model);
-                        }
-                    }
-                }
-            }
+            None => return Err("No word of the day for today"),
         }
 
         Err("Error obtaining word of the day")

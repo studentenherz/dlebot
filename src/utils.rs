@@ -5,7 +5,6 @@ use base64::{
 };
 
 pub const MAX_MASSAGE_LENGTH: usize = 4096;
-pub const MAX_WOTD_LENGTH: usize = 400;
 pub const SUBS_CALLBACK_DATA: &str = "__subs";
 pub const DESUBS_CALLBACK_DATA: &str = "__desubs";
 const CUSTOM_ENGINE: engine::GeneralPurpose =
