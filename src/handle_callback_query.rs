@@ -1,6 +1,6 @@
 use teloxide::{
     prelude::*,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, User},
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, MaybeInaccessibleMessage, User},
 };
 
 use crate::{
@@ -61,7 +61,7 @@ pub async fn handle_callback_query(
                 bot.answer_callback_query(query.id.clone())
                     .text("✅ ¡Te has suscrito!")
                     .await?;
-                if let Some(message) = query.message {
+                if let Some(MaybeInaccessibleMessage::Regular(message)) = query.message {
                     edit_message(true, message, query.from, bot).await?;
                 }
                 db_handler.set_subscribed(user_id, true).await;
@@ -73,7 +73,7 @@ pub async fn handle_callback_query(
                 bot.answer_callback_query(query.id)
                     .text("❌ Te has desuscrito.")
                     .await?;
-                if let Some(message) = query.message {
+                if let Some(MaybeInaccessibleMessage::Regular(message)) = query.message {
                     edit_message(false, message, query.from, bot).await?;
                 }
                 db_handler.set_subscribed(user_id, false).await;

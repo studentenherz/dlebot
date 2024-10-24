@@ -2,14 +2,14 @@ use teloxide::{
     payloads::AnswerInlineQuery,
     prelude::*,
     types::{
-        InlineQueryResult, InlineQueryResultArticle, InputMessageContent, InputMessageContentText,
-        Me, ParseMode,
+        InlineQueryResult, InlineQueryResultArticle, InlineQueryResultsButton,
+        InlineQueryResultsButtonKind, InputMessageContent, InputMessageContentText, Me, ParseMode,
     },
 };
 
 use crate::{
     database::DatabaseHandler,
-    utils::{base64_encode, smart_split, MAX_MASSAGE_LENGTH},
+    utils::{base64_encode, smart_split, DISABLED_LINK_PREVIEW, MAX_MASSAGE_LENGTH},
     DLEBot,
 };
 
@@ -55,7 +55,7 @@ pub async fn handle_inline(
                     &word.lemma,
                     InputMessageContent::Text(
                         InputMessageContentText::new(part_with_deep_link)
-                            .disable_web_page_preview(true)
+                            .link_preview_options(DISABLED_LINK_PREVIEW)
                             .parse_mode(ParseMode::Html),
                     ),
                 )
@@ -73,8 +73,10 @@ pub async fn handle_inline(
                 cache_time: None,
                 is_personal: None,
                 next_offset: None,
-                switch_pm_parameter: Some(base64_encode(q.query)),
-                switch_pm_text: Some("No se han encontrado resultados".to_string()),
+                button: Some(InlineQueryResultsButton {
+                    text: "No se han encontrado resultados".to_string(),
+                    kind: InlineQueryResultsButtonKind::StartParameter(base64_encode(q.query)),
+                }),
             },
         )
         .await?;

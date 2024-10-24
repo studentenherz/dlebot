@@ -1,7 +1,11 @@
 use chrono::NaiveDate;
 use teloxide::{
+    payloads::SendMessageSetters,
     prelude::*,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me},
+    types::{
+        InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me,
+        ReplyParameters,
+    },
     utils::command::{BotCommands, ParseError},
 };
 
@@ -9,7 +13,7 @@ use crate::{
     broadcast::broadcast_for_all,
     database::DatabaseHandler,
     image::send_image,
-    utils::{base64_decode, base64_encode, smart_split, MAX_MASSAGE_LENGTH},
+    utils::{base64_decode, base64_encode, smart_split, DISABLED_LINK_PREVIEW, MAX_MASSAGE_LENGTH},
     DLEBot,
 };
 
@@ -73,10 +77,10 @@ async fn send_start(bot: DLEBot, msg: Message) -> ResponseResult<()> {
         KeyboardButton::new(KEY_WOTD),
     ]])
     .append_row([KeyboardButton::new(KEY_HELP)])
-    .resize_keyboard(true);
+    .resize_keyboard();
 
     bot.send_message(msg.chat.id, include_str!("templates/start.txt"))
-        .disable_web_page_preview(true)
+        .link_preview_options(DISABLED_LINK_PREVIEW)
         .reply_markup(keyboard)
         .await?;
 
@@ -155,7 +159,7 @@ pub async fn send_message(
                     definition.to_string()
                 };
                 bot.send_message(msg.chat.id, definition)
-                    .disable_web_page_preview(true)
+                    .link_preview_options(DISABLED_LINK_PREVIEW)
                     .await?;
             }
 
@@ -198,7 +202,7 @@ pub async fn send_message(
                 msg.chat.id,
                 format!(include_str!("templates/not_found.txt"), text, similar_words),
             )
-            .disable_web_page_preview(true)
+            .link_preview_options(DISABLED_LINK_PREVIEW)
             .reply_markup(inline_keyboard)
             .await?;
         }
@@ -213,7 +217,7 @@ pub async fn handle_message(
     msg: Message,
     me: Me,
 ) -> ResponseResult<()> {
-    if let Some(user) = msg.clone().from() {
+    if let Some(user) = msg.clone().from {
         if let Ok(user_id) = user.id.0.try_into() {
             db_handler.set_in_bot(user_id, true).await;
 
@@ -380,7 +384,7 @@ pub async fn handle_edited_message(
     bot: DLEBot,
     msg: Message,
 ) -> ResponseResult<()> {
-    if let Some(user) = msg.clone().from() {
+    if let Some(user) = msg.clone().from {
         if let Ok(user_id) = user.id.0.try_into() {
             db_handler.set_in_bot(user_id, true).await;
 
@@ -400,7 +404,7 @@ pub async fn handle_edited_message(
                                 msg.chat.id,
                                 format!("😌 ¡Ahora sí!\n\n{}", definition.trim()),
                             )
-                            .reply_to_message_id(msg.id)
+                            .reply_parameters(ReplyParameters::new(msg.id))
                             .await?;
                         }
 
@@ -427,7 +431,7 @@ pub async fn handle_edited_message(
 
                         bot.send_message(msg.chat.id, format!("😐 Así tampoco\n\n{}", text))
                             .reply_markup(inline_keyboard)
-                            .reply_to_message_id(msg.id)
+                            .reply_parameters(ReplyParameters::new(msg.id))
                             .await?;
                     }
                 }
