@@ -3,12 +3,20 @@ use base64::{
     engine::{self, general_purpose},
     Engine as _,
 };
+use teloxide::types::LinkPreviewOptions;
 
 pub const MAX_MASSAGE_LENGTH: usize = 4096;
 pub const SUBS_CALLBACK_DATA: &str = "__subs";
 pub const DESUBS_CALLBACK_DATA: &str = "__desubs";
 const CUSTOM_ENGINE: engine::GeneralPurpose =
     engine::GeneralPurpose::new(&alphabet::URL_SAFE, general_purpose::NO_PAD);
+pub const DISABLED_LINK_PREVIEW: LinkPreviewOptions = LinkPreviewOptions {
+    is_disabled: true,
+    url: None,
+    prefer_small_media: false,
+    prefer_large_media: false,
+    show_above_text: false,
+};
 
 /// Split one string into multiple strings with a maximum length of `chars_per_string`.
 /// Splits by '\n', '. ' or ' ' in this priority.
