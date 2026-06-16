@@ -11,8 +11,9 @@ use teloxide::{
 
 use crate::{
     broadcast::broadcast_for_all,
-    database::DatabaseHandler,
+    database::{DatabaseHandler, DleModel},
     image::send_image,
+    rich_text::{InputRichMessage, RichMessageExt},
     utils::{base64_decode, base64_encode, smart_split, DISABLED_LINK_PREVIEW, MAX_MASSAGE_LENGTH},
     DLEBot,
 };
@@ -106,9 +107,14 @@ async fn send_help(bot: DLEBot, msg: Message, me: Me) -> ResponseResult<()> {
     Ok(())
 }
 
-async fn send_random(db_handler: DatabaseHandler, bot: DLEBot, msg: Message) -> ResponseResult<()> {
+async fn send_random(
+    db_handler: DatabaseHandler,
+    bot: DLEBot,
+    msg: Message,
+    me: Me,
+) -> ResponseResult<()> {
     if let Some(result) = db_handler.get_random().await {
-        bot.send_message(msg.chat.id, result.definition).await?;
+        send_result(bot, &msg, me, &result).await?;
     }
 
     Ok(())
@@ -130,6 +136,60 @@ async fn send_word_of_the_day(
     Ok(())
 }
 
+// This is ugly, it is fixing some poor decisions I made years ago
+fn formatted_definition(original: &str, lemma: &str, username: &str) -> String {
+    let mut formatted = String::from(original);
+    let mut found_some = false;
+    for sup in ['¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'] {
+        let patt = format!("{lemma}{sup}");
+        if let Some(pos) = formatted.find(&patt) {
+            found_some = true;
+            formatted.replace_range(
+                pos..pos + patt.len(),
+                &format!(
+                    r#"<h1><a href="https://t.me/{}?start={}">{}</a></h1>"#,
+                    username,
+                    base64_encode(lemma.to_string()),
+                    patt
+                ),
+            );
+        }
+    }
+
+    if !found_some {
+        let patt = lemma;
+        if let Some(pos) = formatted.find(&patt) {
+            formatted.replace_range(
+                pos..pos + patt.len(),
+                &format!(
+                    r#"<h1><a href="https://t.me/{}?start={}">{}</a></h1>"#,
+                    username,
+                    base64_encode(lemma.to_string()),
+                    patt
+                ),
+            );
+        }
+    }
+
+    formatted.replace("\n1", "\n\n1")
+}
+
+async fn send_result(bot: DLEBot, msg: &Message, me: Me, result: &DleModel) -> ResponseResult<()> {
+    for &definition in smart_split(&result.definition, MAX_MASSAGE_LENGTH).iter() {
+        let formatted = formatted_definition(&definition, &result.lemma, me.username());
+        let rich_message = InputRichMessage {
+            markdown: Some(formatted),
+            html: None,
+            is_rtl: None,
+            skip_entity_detection: None,
+        };
+
+        bot.send_rich_message(msg.chat.id, rich_message).await?;
+    }
+
+    Ok(())
+}
+
 pub async fn send_message(
     db_handler: DatabaseHandler,
     bot: DLEBot,
@@ -140,28 +200,7 @@ pub async fn send_message(
 ) -> ResponseResult<()> {
     match db_handler.get_exact(text).await {
         Some(result) => {
-            for (index, &definition) in smart_split(&result.definition, MAX_MASSAGE_LENGTH)
-                .iter()
-                .enumerate()
-            {
-                let definition = if index == 0 {
-                    definition.replacen(
-                        &result.lemma,
-                        &format!(
-                            r#"<a href="https://t.me/{}?start={}">{}</a>"#,
-                            me.username(),
-                            base64_encode(result.lemma.to_string()),
-                            result.lemma
-                        ),
-                        1,
-                    )
-                } else {
-                    definition.to_string()
-                };
-                bot.send_message(msg.chat.id, definition)
-                    .link_preview_options(DISABLED_LINK_PREVIEW)
-                    .await?;
-            }
+            send_result(bot, &msg, me, &result).await?;
 
             db_handler
                 .add_sent_definition_event(user_id, msg.date.into(), result.lemma)
@@ -349,7 +388,7 @@ pub async fn handle_message(
                             }
 
                             Ok(Command::Aleatorio) => {
-                                send_random(db_handler, bot, msg).await?;
+                                send_random(db_handler, bot, msg, me).await?;
                             }
 
                             Ok(Command::Pdd) => {
@@ -358,7 +397,7 @@ pub async fn handle_message(
 
                             Err(_) => match text {
                                 KEY_RANDOM => {
-                                    send_random(db_handler, bot, msg).await?;
+                                    send_random(db_handler, bot, msg, me).await?;
                                 }
                                 KEY_HELP => {
                                     send_help(bot, msg, me).await?;

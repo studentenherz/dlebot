@@ -66,7 +66,7 @@ pub async fn handle_inline(
 
     if results.is_empty() {
         <Bot as Requester>::AnswerInlineQuery::new(
-            bot.inner().clone(),
+            bot.clone(),
             AnswerInlineQuery {
                 inline_query_id: q.id,
                 results,
