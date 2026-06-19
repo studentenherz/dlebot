@@ -7,7 +7,7 @@ use regex::Regex;
 use usvg::{fontdb, TreeParsing, TreeTextToPath};
 
 use crate::{
-    database::DleModel,
+    dle_ir::{sanitize_html, DleWord},
     utils::{base64_encode, split_by_whitespace},
     DLEBot,
 };
@@ -57,8 +57,6 @@ fn get_image(lemma: &str, etymology: &str, channel: &str) -> Result<Vec<u8>, png
         font_size_big = FONT_SIZE_BIG
     );
 
-    // resvg::Tree own all the required data and does not require
-    // the input file, usvg::Tree or anything else.
     let tree = {
         let opt = usvg::Options {
             font_family: "Tinos".to_string(),
@@ -131,40 +129,41 @@ fn fix_tags(input: &mut [String]) {
 }
 
 pub async fn send_image(
-    word: DleModel,
+    word: DleWord,
     bot: DLEBot,
     chat_id: ChatId,
     pdd: bool,
 ) -> ResponseResult<()> {
-    let mut split = word.definition.trim_start().split('\n');
-    let lemma = split.next().unwrap().trim().convert_html_tags_to_svg();
-    let mut etymology = split.next().unwrap().trim();
-    if etymology.is_empty() {
-        etymology = split.next().unwrap().trim();
-    }
+    let headword = word.headword().to_string();
+    let lemma_svg = headword.as_str().convert_html_tags_to_svg();
 
+    // Prefer HTML etymology (preserves italics on Latin text) over plain text.
+    let etymology_raw = word
+        .entries
+        .first()
+        .and_then(|e| e.etymology_html.as_deref().or(e.etymology_text.as_deref()))
+        .unwrap_or("");
+
+    let etymology_sanitized = sanitize_html(etymology_raw);
     let dy = INTERLINE_SPACING * FONT_SIZE_NORMAL;
-    let mut etymology_lines: Vec<String> = split_by_whitespace(etymology, MAX_CHARACTERS_IN_LINE)
+    let mut etymology_lines: Vec<String> = split_by_whitespace(&etymology_sanitized, MAX_CHARACTERS_IN_LINE)
         .iter()
         .map(|&line| line.convert_html_tags_to_svg())
         .collect();
     fix_tags(&mut etymology_lines);
 
-    let mut etymology = String::new();
+    let mut etymology_svg = String::new();
     for (i, line) in etymology_lines.iter().enumerate() {
-        etymology += &format!(r#"<tspan x="10" dy="{}">{}</tspan>"#, i as f64 * dy, line);
+        etymology_svg += &format!(r#"<tspan x="10" dy="{}">{}</tspan>"#, i as f64 * dy, line);
     }
 
-    let definition = word.definition.replacen(
-        &lemma,
-        &format!(
-            r#"<a href="https://t.me/{}?start={}">{}</a>"#,
-            bot.get_me().await.unwrap().username(),
-            base64_encode(word.lemma.to_string()),
-            lemma
-        ),
-        1,
+    let bot_me = bot.get_me().await.unwrap();
+    let deep_link_url = format!(
+        "https://t.me/{}?start={}",
+        bot_me.username(),
+        base64_encode(word.query.clone())
     );
+    let caption = word.to_html_with_deeplink(&deep_link_url);
 
     let mut channel = String::new();
     if let Ok(chat) = bot.get_chat(chat_id).await {
@@ -175,12 +174,12 @@ pub async fn send_image(
         }
     }
 
-    if let Ok(image) = get_image(&lemma, &etymology, &channel) {
+    if let Ok(image) = get_image(&lemma_svg, &etymology_svg, &channel) {
         bot.send_photo(chat_id, InputFile::memory(image))
             .caption(format!(
                 "{} {}",
                 if pdd { "📖 #PalabraDelDía |" } else { "" },
-                definition.trim()
+                caption.trim()
             ))
             .await?;
     }

@@ -5,6 +5,7 @@ mod handle_chat_member;
 mod handle_inline;
 mod handle_message;
 mod image;
+mod dle_ir;
 mod utils;
 mod word_of_the_day;
 

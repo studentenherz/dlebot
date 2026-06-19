@@ -63,7 +63,6 @@ enum AdminCommand {
 
 pub async fn set_commands(bot: DLEBot) -> ResponseResult<()> {
     bot.set_my_commands(Command::bot_commands()).await?;
-
     Ok(())
 }
 
@@ -108,9 +107,10 @@ async fn send_help(bot: DLEBot, msg: Message, me: Me) -> ResponseResult<()> {
 
 async fn send_random(db_handler: DatabaseHandler, bot: DLEBot, msg: Message) -> ResponseResult<()> {
     if let Some(result) = db_handler.get_random().await {
-        bot.send_message(msg.chat.id, result.definition).await?;
+        bot.send_message(msg.chat.id, result.to_html())
+            .link_preview_options(DISABLED_LINK_PREVIEW)
+            .await?;
     }
-
     Ok(())
 }
 
@@ -122,11 +122,11 @@ async fn send_word_of_the_day(
     if let Ok(wotd) = db_handler.get_word_of_the_day().await {
         bot.send_message(
             msg.chat.id,
-            format!("📖 Palabra del día\n\n {}", wotd.definition.trim()),
+            format!("📖 Palabra del día\n\n {}", wotd.to_html().trim()),
         )
+        .link_preview_options(DISABLED_LINK_PREVIEW)
         .await?;
     }
-
     Ok(())
 }
 
@@ -140,31 +140,34 @@ pub async fn send_message(
 ) -> ResponseResult<()> {
     match db_handler.get_exact(text).await {
         Some(result) => {
-            for (index, &definition) in smart_split(&result.definition, MAX_MASSAGE_LENGTH)
-                .iter()
-                .enumerate()
-            {
-                let definition = if index == 0 {
-                    definition.replacen(
-                        &result.lemma,
+            let headword = result.headword().to_string();
+            let html = result.to_html();
+            let deep_link_url = format!(
+                "https://t.me/{}?start={}",
+                me.username(),
+                base64_encode(result.query.clone())
+            );
+
+            for (index, &part) in smart_split(&html, MAX_MASSAGE_LENGTH).iter().enumerate() {
+                let part = if index == 0 {
+                    part.replacen(
+                        &format!("<b>{}</b>", headword),
                         &format!(
-                            r#"<a href="https://t.me/{}?start={}">{}</a>"#,
-                            me.username(),
-                            base64_encode(result.lemma.to_string()),
-                            result.lemma
+                            r#"<b><a href="{}">{}</a></b>"#,
+                            deep_link_url, headword
                         ),
                         1,
                     )
                 } else {
-                    definition.to_string()
+                    part.to_string()
                 };
-                bot.send_message(msg.chat.id, definition)
+                bot.send_message(msg.chat.id, part)
                     .link_preview_options(DISABLED_LINK_PREVIEW)
                     .await?;
             }
 
             db_handler
-                .add_sent_definition_event(user_id, msg.date.into(), result.lemma)
+                .add_sent_definition_event(user_id, msg.date.into(), result.query)
                 .await;
         }
         None => {
@@ -253,7 +256,6 @@ pub async fn handle_message(
                                     )
                                     .await?;
                                 }
-
                                 return Ok(());
                             }
                             Ok(AdminCommand::SetPdd { date, lemma })
@@ -286,10 +288,11 @@ pub async fn handle_message(
                                 } else {
                                     bot.send_message(msg.chat.id, "El formato de la fecha es <pre>%d/%m/%Y</pre> (por ejemplo: 17/7/1997)").await?;
                                 }
-
                                 return Ok(());
                             }
-                            Ok(AdminCommand::GetSchedule) if db_handler.is_admin(user_id).await => {
+                            Ok(AdminCommand::GetSchedule)
+                                if db_handler.is_admin(user_id).await =>
+                            {
                                 match db_handler.get_word_of_the_day_schedule().await {
                                     Ok(schedule) => {
                                         let mut text = String::new();
@@ -300,7 +303,6 @@ pub async fn handle_message(
                                                 wotd.lemma
                                             );
                                         }
-
                                         bot.send_message(msg.chat.id, text).await?;
                                     }
                                     Err(error) => {
@@ -314,7 +316,6 @@ pub async fn handle_message(
                                         .await?;
                                     }
                                 }
-
                                 return Ok(());
                             }
                             _ => {}
@@ -399,25 +400,27 @@ pub async fn handle_edited_message(
 
                 match db_handler.get_exact(text).await {
                     Some(result) => {
-                        for definition in smart_split(&result.definition, MAX_MASSAGE_LENGTH) {
+                        let html = result.to_html();
+                        for part in smart_split(&html, MAX_MASSAGE_LENGTH) {
                             bot.send_message(
                                 msg.chat.id,
-                                format!("😌 ¡Ahora sí!\n\n{}", definition.trim()),
+                                format!("😌 ¡Ahora sí!\n\n{}", part.trim()),
                             )
                             .reply_parameters(ReplyParameters::new(msg.id))
+                            .link_preview_options(DISABLED_LINK_PREVIEW)
                             .await?;
                         }
 
                         db_handler
-                            .add_sent_definition_event(user_id, msg.date.into(), result.lemma)
+                            .add_sent_definition_event(user_id, msg.date.into(), result.query)
                             .await;
                     }
                     None => {
-                        let url = match reqwest::Url::parse(&format!("https://dle.rae.es/{}", text))
-                        {
-                            Ok(value) => value,
-                            Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
-                        };
+                        let url =
+                            match reqwest::Url::parse(&format!("https://dle.rae.es/{}", text)) {
+                                Ok(value) => value,
+                                Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
+                            };
 
                         let inline_keyboard = InlineKeyboardMarkup::new([[
                             InlineKeyboardButton::switch_inline_query_current_chat(
@@ -427,12 +430,16 @@ pub async fn handle_edited_message(
                             InlineKeyboardButton::url("Buscar en dle.rae.es", url),
                         ]]);
 
-                        let text = format!(include_str!("templates/not_found.txt"), text, "");
+                        let not_found =
+                            format!(include_str!("templates/not_found.txt"), text, "");
 
-                        bot.send_message(msg.chat.id, format!("😐 Así tampoco\n\n{}", text))
-                            .reply_markup(inline_keyboard)
-                            .reply_parameters(ReplyParameters::new(msg.id))
-                            .await?;
+                        bot.send_message(
+                            msg.chat.id,
+                            format!("😐 Así tampoco\n\n{}", not_found),
+                        )
+                        .reply_markup(inline_keyboard)
+                        .reply_parameters(ReplyParameters::new(msg.id))
+                        .await?;
                     }
                 }
             }

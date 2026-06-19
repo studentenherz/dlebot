@@ -28,38 +28,42 @@ pub async fn handle_inline(
     let mut results: Vec<InlineQueryResult> = vec![];
 
     for word in words {
-        for (id, &part) in smart_split(&word.definition, MAX_MASSAGE_LENGTH)
-            .iter()
-            .enumerate()
-        {
-            let part = if id == 0 {
-                part.to_string()
+        let headword = word.headword().to_string();
+        let html = word.to_html();
+        let text = word.to_text();
+        let deep_link_url = format!(
+            "https://t.me/{}?start={}",
+            me.username(),
+            base64_encode(word.query.clone())
+        );
+
+        let html_parts = smart_split(&html, MAX_MASSAGE_LENGTH);
+        let text_parts = smart_split(&text, MAX_MASSAGE_LENGTH);
+
+        for (id, &html_part) in html_parts.iter().enumerate() {
+            let html_with_link = if id == 0 {
+                html_part.replacen(
+                    &format!("<b>{}</b>", headword),
+                    &format!(r#"<b><a href="{}">{}</a></b>"#, deep_link_url, headword),
+                    1,
+                )
             } else {
-                format!("{}\n{}", &word.lemma, part)
+                format!("<b>{}</b>\n{}", headword, html_part)
             };
 
-            let part_with_deep_link = part.replacen(
-                &word.lemma,
-                &format!(
-                    r#"<a href="https://t.me/{}?start={}">{}</a>"#,
-                    me.username(),
-                    base64_encode(word.lemma.clone()),
-                    word.lemma
-                ),
-                1,
-            );
+            let description = text_parts.get(id).copied().unwrap_or_default();
 
             results.push(InlineQueryResult::Article(
                 InlineQueryResultArticle::new(
-                    format!("{}_{}", &word.lemma, id),
-                    &word.lemma,
+                    format!("{}_{}", word.query, id),
+                    headword.clone(),
                     InputMessageContent::Text(
-                        InputMessageContentText::new(part_with_deep_link)
+                        InputMessageContentText::new(html_with_link)
                             .link_preview_options(DISABLED_LINK_PREVIEW)
                             .parse_mode(ParseMode::Html),
                     ),
                 )
-                .description(part),
+                .description(description),
             ));
         }
     }
