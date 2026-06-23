@@ -3,34 +3,14 @@ use std::env;
 
 use chrono::{offset::Local, NaiveDate};
 use sea_orm::{
-    entity::prelude::DateTimeWithTimeZone,
-    sea_query::Expr,
-    ActiveModelTrait,
-    ColumnTrait,
-    ConnectOptions,
-    ConnectionTrait,
-    Database,
-    DatabaseConnection,
-    DbBackend,
-    DbErr,
-    EntityTrait,
-    QueryFilter,
-    QueryOrder,
-    QuerySelect,
-    Set,
-    Statement,
-    Value,
+    entity::prelude::DateTimeWithTimeZone, sea_query::Expr, ActiveModelTrait, ColumnTrait,
+    ConnectOptions, ConnectionTrait, Database, DatabaseConnection, DbBackend, DbErr, EntityTrait,
+    QueryFilter, QueryOrder, QuerySelect, Set, Statement, Value,
 };
 
-use crate::dle_ir::{
-    DleEntry, DleExample, DleLabel, DleRelation, DleSense, DleSenseGroup, DleWord,
-};
+use crate::dle_ir::{DleEntry, DleExample, DleRelation, DleSense, DleSenseGroup, DleWord};
 
-use super::schema::{
-    event, lemmas,
-    sea_orm_active_enums::EventType,
-    user, word_of_the_day,
-};
+use super::schema::{event, lemmas, sea_orm_active_enums::EventType, user, word_of_the_day};
 
 #[derive(Clone)]
 pub struct DatabaseHandler {
@@ -51,7 +31,10 @@ impl DatabaseHandler {
 }
 
 fn make_placeholders(n: usize) -> String {
-    (1..=n).map(|i| format!("${i}")).collect::<Vec<_>>().join(", ")
+    (1..=n)
+        .map(|i| format!("${i}"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 impl DatabaseHandler {
@@ -76,12 +59,15 @@ impl DatabaseHandler {
                         s.definition_text,    s.definition_html \
                      FROM entries e \
                      JOIN sense_groups sg ON sg.entry_id      = e.id \
-                     JOIN senses       s  ON s.sense_group_id = sg.id \
+                     LEFT JOIN senses  s  ON s.sense_group_id = sg.id \
                      WHERE e.lemma_id IN ({}) \
                      ORDER BY e.lemma_id, e.id, sg.position, s.number",
                     make_placeholders(lemma_ids.len())
                 ),
-                lemma_ids.iter().map(|&id| id.into()).collect::<Vec<Value>>(),
+                lemma_ids
+                    .iter()
+                    .map(|&id| id.into())
+                    .collect::<Vec<Value>>(),
             ))
             .await
             .unwrap_or_else(|e| {
@@ -94,13 +80,12 @@ impl DatabaseHandler {
             let mut seen = HashSet::new();
             for row in &structural_rows {
                 let sid: i64 = row.try_get("", "sense_id").unwrap_or(0);
-                if seen.insert(sid) {
+                if sid != 0 && seen.insert(sid) {
                     sense_ids.push(sid);
                 }
             }
         }
 
-        let mut labels_by_sense: HashMap<i64, Vec<DleLabel>> = HashMap::new();
         let mut examples_by_sense: HashMap<i64, Vec<DleExample>> = HashMap::new();
         let mut relations_by_sense: HashMap<i64, Vec<DleRelation>> = HashMap::new();
 
@@ -108,18 +93,7 @@ impl DatabaseHandler {
             let sp = make_placeholders(sense_ids.len());
             let sv: Vec<Value> = sense_ids.iter().map(|&id| id.into()).collect();
 
-            let (labels_res, examples_res, relations_res) = tokio::join!(
-                self.db.query_all(Statement::from_sql_and_values(
-                    DbBackend::Postgres,
-                    &format!(
-                        "SELECT sl.sense_id, l.abbr, l.full_text, sl.ordinal \
-                         FROM sense_labels sl \
-                         JOIN labels l ON l.id = sl.label_id \
-                         WHERE sl.sense_id IN ({sp}) \
-                         ORDER BY sl.sense_id, sl.ordinal"
-                    ),
-                    sv.clone(),
-                )),
+            let (examples_res, relations_res) = tokio::join!(
                 self.db.query_all(Statement::from_sql_and_values(
                     DbBackend::Postgres,
                     &format!(
@@ -132,7 +106,7 @@ impl DatabaseHandler {
                 self.db.query_all(Statement::from_sql_and_values(
                     DbBackend::Postgres,
                     &format!(
-                        "SELECT sense_id, kind, word, scope FROM relations \
+                        "SELECT sense_id, kind, word, homograph, scope FROM relations \
                          WHERE sense_id IN ({sp}) \
                          ORDER BY sense_id, position"
                     ),
@@ -140,25 +114,16 @@ impl DatabaseHandler {
                 )),
             );
 
-            match labels_res {
-                Ok(rows) => {
-                    for row in rows {
-                        let sense_id: i64 = row.try_get("", "sense_id").unwrap_or(0);
-                        labels_by_sense.entry(sense_id).or_default().push(DleLabel {
-                            abbr: row.try_get("", "abbr").unwrap_or_default(),
-                            full_text: row.try_get("", "full_text").unwrap_or(None),
-                        });
-                    }
-                }
-                Err(e) => log::error!("DB error fetching labels: {:?}", e),
-            }
             match examples_res {
                 Ok(rows) => {
                     for row in rows {
                         let sense_id: i64 = row.try_get("", "sense_id").unwrap_or(0);
-                        examples_by_sense.entry(sense_id).or_default().push(DleExample {
-                            text: row.try_get("", "text").unwrap_or_default(),
-                        });
+                        examples_by_sense
+                            .entry(sense_id)
+                            .or_default()
+                            .push(DleExample {
+                                text: row.try_get("", "text").unwrap_or_default(),
+                            });
                     }
                 }
                 Err(e) => log::error!("DB error fetching examples: {:?}", e),
@@ -167,11 +132,15 @@ impl DatabaseHandler {
                 Ok(rows) => {
                     for row in rows {
                         let sense_id: i64 = row.try_get("", "sense_id").unwrap_or(0);
-                        relations_by_sense.entry(sense_id).or_default().push(DleRelation {
-                            kind: row.try_get("", "kind").unwrap_or_default(),
-                            word: row.try_get("", "word").unwrap_or_default(),
-                            scope: row.try_get("", "scope").unwrap_or(None),
-                        });
+                        relations_by_sense
+                            .entry(sense_id)
+                            .or_default()
+                            .push(DleRelation {
+                                kind: row.try_get("", "kind").unwrap_or_default(),
+                                word: row.try_get("", "word").unwrap_or_default(),
+                                homograph: row.try_get("", "homograph").unwrap_or(None),
+                                scope: row.try_get("", "scope").unwrap_or(None),
+                            });
                     }
                 }
                 Err(e) => log::error!("DB error fetching relations: {:?}", e),
@@ -200,7 +169,10 @@ impl DatabaseHandler {
                 let sense_id: i64 = row.try_get("", "sense_id").unwrap_or(0);
 
                 if seen_entries.insert(entry_id) {
-                    entry_ids_by_lemma.entry(lemma_id).or_default().push(entry_id);
+                    entry_ids_by_lemma
+                        .entry(lemma_id)
+                        .or_default()
+                        .push(entry_id);
                     entry_fields.insert(
                         entry_id,
                         (
@@ -213,7 +185,10 @@ impl DatabaseHandler {
                 }
 
                 if seen_groups.insert(group_id) {
-                    group_ids_by_entry.entry(entry_id).or_default().push(group_id);
+                    group_ids_by_entry
+                        .entry(entry_id)
+                        .or_default()
+                        .push(group_id);
                     group_fields.insert(
                         group_id,
                         (
@@ -223,15 +198,20 @@ impl DatabaseHandler {
                     );
                 }
 
-                sense_ids_by_group.entry(group_id).or_default().push(sense_id);
-                sense_fields.insert(
-                    sense_id,
-                    (
-                        row.try_get("", "sense_number").unwrap_or(None),
-                        row.try_get("", "definition_text").unwrap_or(None),
-                        row.try_get("", "definition_html").unwrap_or(None),
-                    ),
-                );
+                if sense_id != 0 {
+                    sense_ids_by_group
+                        .entry(group_id)
+                        .or_default()
+                        .push(sense_id);
+                    sense_fields.insert(
+                        sense_id,
+                        (
+                            row.try_get("", "sense_number").unwrap_or(None),
+                            row.try_get("", "definition_text").unwrap_or(None),
+                            row.try_get("", "definition_html").unwrap_or(None),
+                        ),
+                    );
+                }
             }
         }
 
@@ -263,9 +243,6 @@ impl DatabaseHandler {
                                             number,
                                             definition_text,
                                             definition_html,
-                                            labels: labels_by_sense
-                                                .remove(&sense_id)
-                                                .unwrap_or_default(),
                                             examples: examples_by_sense
                                                 .remove(&sense_id)
                                                 .unwrap_or_default(),
@@ -276,7 +253,9 @@ impl DatabaseHandler {
                                     })
                                     .collect();
                                 match kind.as_str() {
-                                    "complex_form" => DleSenseGroup::ComplexForm { form_text, senses },
+                                    "complex_form" => {
+                                        DleSenseGroup::ComplexForm { form_text, senses }
+                                    }
                                     _ => DleSenseGroup::Main { senses },
                                 }
                             })
@@ -406,9 +385,7 @@ impl DatabaseHandler {
         }
     }
 
-    pub async fn get_word_of_the_day_schedule(
-        &self,
-    ) -> Result<Vec<word_of_the_day::Model>, DbErr> {
+    pub async fn get_word_of_the_day_schedule(&self) -> Result<Vec<word_of_the_day::Model>, DbErr> {
         word_of_the_day::Entity::find()
             .limit(10)
             .filter(word_of_the_day::Column::Date.is_not_null())
@@ -435,11 +412,10 @@ impl DatabaseHandler {
             });
 
         match wotd {
-            Some(word_of_the_day::Model { lemma, .. }) => {
-                self.get_exact(&lemma)
-                    .await
-                    .ok_or("Error obtaining word of the day")
-            }
+            Some(word_of_the_day::Model { lemma, .. }) => self
+                .get_exact(&lemma)
+                .await
+                .ok_or("Error obtaining word of the day"),
             None => Err("No word of the day for today"),
         }
     }

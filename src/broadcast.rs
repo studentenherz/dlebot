@@ -25,7 +25,7 @@ pub async fn _broadcast_word_of_the_day(
 ) -> ResponseResult<()> {
     if let Ok(wotd) = db_handler.get_word_of_the_day().await {
         broadcast(
-            format!("📖 Palabra del día\n\n {}", wotd.to_html().trim()),
+            format!("📖 Palabra del día\n\n {}", wotd.to_html(None).trim()),
             db_handler._get_subscribed_and_in_bot_list().await,
             bot,
         )

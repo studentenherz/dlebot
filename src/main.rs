@@ -1,16 +1,17 @@
 mod broadcast;
 mod database;
+mod dle_ir;
 mod handle_callback_query;
 mod handle_chat_member;
 mod handle_inline;
 mod handle_message;
 mod image;
-mod dle_ir;
+mod rich_messages;
 mod utils;
 mod word_of_the_day;
 
 use dotenvy::dotenv;
-use teloxide::{adaptors::DefaultParseMode, prelude::*, update_listeners::webhooks};
+use teloxide::{prelude::*, update_listeners::webhooks};
 
 use database::DatabaseHandler;
 use handle_callback_query::handle_callback_query;
@@ -19,7 +20,7 @@ use handle_inline::{handle_chosen_inline_result, handle_inline};
 use handle_message::{handle_edited_message, handle_message, set_commands};
 use word_of_the_day::schedule_word_of_the_day;
 
-pub type DLEBot = DefaultParseMode<Bot>;
+pub type DLEBot = Bot;
 
 #[tokio::main]
 async fn main() -> ResponseResult<()> {
@@ -42,9 +43,8 @@ async fn main() -> ResponseResult<()> {
     let api_url = std::env::var("TELEGRAM_BOT_API_URL").unwrap();
     let api_url = reqwest::Url::parse(&api_url).unwrap();
 
-    let bot = Bot::from_env()
-        .set_api_url(api_url.clone())
-        .parse_mode(teloxide::types::ParseMode::Html);
+    let bot = Bot::from_env().set_api_url(api_url.clone());
+    // .parse_mode(teloxide::types::ParseMode::Html);
 
     let port: u16 = std::env::var("WEBHOOK_PORT").unwrap().parse().unwrap();
     let addr = ([127, 0, 0, 1], port).into();

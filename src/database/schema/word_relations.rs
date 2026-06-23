@@ -8,6 +8,7 @@ pub struct Model {
     pub sense_id: i64,
     pub kind: String,
     pub word: String,
+    pub homograph: Option<i16>,
     pub scope: Option<String>,
     pub position: i16,
 }

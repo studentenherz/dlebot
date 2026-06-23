@@ -146,10 +146,11 @@ pub async fn send_image(
 
     let etymology_sanitized = sanitize_html(etymology_raw);
     let dy = INTERLINE_SPACING * FONT_SIZE_NORMAL;
-    let mut etymology_lines: Vec<String> = split_by_whitespace(&etymology_sanitized, MAX_CHARACTERS_IN_LINE)
-        .iter()
-        .map(|&line| line.convert_html_tags_to_svg())
-        .collect();
+    let mut etymology_lines: Vec<String> =
+        split_by_whitespace(&etymology_sanitized, MAX_CHARACTERS_IN_LINE)
+            .iter()
+            .map(|&line| line.convert_html_tags_to_svg())
+            .collect();
     fix_tags(&mut etymology_lines);
 
     let mut etymology_svg = String::new();
@@ -161,7 +162,7 @@ pub async fn send_image(
     let deep_link_url = format!(
         "https://t.me/{}?start={}",
         bot_me.username(),
-        base64_encode(word.query.clone())
+        base64_encode(&word.query)
     );
     let caption = word.to_html_with_deeplink(&deep_link_url);
 

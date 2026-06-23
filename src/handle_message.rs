@@ -3,7 +3,7 @@ use teloxide::{
     payloads::SendMessageSetters,
     prelude::*,
     types::{
-        InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me,
+        InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me, ParseMode,
         ReplyParameters,
     },
     utils::command::{BotCommands, ParseError},
@@ -12,7 +12,9 @@ use teloxide::{
 use crate::{
     broadcast::broadcast_for_all,
     database::DatabaseHandler,
+    dle_ir::DleWord,
     image::send_image,
+    rich_messages::{InputRichMessage, RichMessageExt},
     utils::{base64_decode, base64_encode, smart_split, DISABLED_LINK_PREVIEW, MAX_MASSAGE_LENGTH},
     DLEBot,
 };
@@ -28,8 +30,8 @@ enum Command {
     Ayuda,
     #[command(description = "Buscar término aleatorio")]
     Aleatorio,
-    #[command(description = "Mostrar la «Palabra del día»")]
-    Pdd,
+    // #[command(description = "Mostrar la «Palabra del día»")]
+    // Pdd,
 }
 
 fn split_by_first_whitespace(text: String) -> Result<(String, String), ParseError> {
@@ -67,18 +69,20 @@ pub async fn set_commands(bot: DLEBot) -> ResponseResult<()> {
 }
 
 const KEY_RANDOM: &str = "🎲 Palabra aleatoria";
-const KEY_WOTD: &str = "📖 Palabra del día";
+// const KEY_WOTD: &str = "📖 Palabra del día";
 const KEY_HELP: &str = "❔ Ayuda";
 
 async fn send_start(bot: DLEBot, msg: Message) -> ResponseResult<()> {
     let keyboard = KeyboardMarkup::new([[
         KeyboardButton::new(KEY_RANDOM),
-        KeyboardButton::new(KEY_WOTD),
+        KeyboardButton::new(KEY_HELP),
+        // KeyboardButton::new(KEY_WOTD),
     ]])
-    .append_row([KeyboardButton::new(KEY_HELP)])
+    // .append_row([KeyboardButton::new(KEY_HELP)])
     .resize_keyboard();
 
     bot.send_message(msg.chat.id, include_str!("templates/start.txt"))
+        .parse_mode(ParseMode::Html)
         .link_preview_options(DISABLED_LINK_PREVIEW)
         .reply_markup(keyboard)
         .await?;
@@ -99,17 +103,21 @@ async fn send_help(bot: DLEBot, msg: Message, me: Me) -> ResponseResult<()> {
             bot_username = me.username()
         ),
     )
+    .parse_mode(ParseMode::Html)
     .reply_markup(inline_keyboard)
     .await?;
 
     Ok(())
 }
 
-async fn send_random(db_handler: DatabaseHandler, bot: DLEBot, msg: Message) -> ResponseResult<()> {
+async fn send_random(
+    db_handler: DatabaseHandler,
+    bot: DLEBot,
+    msg: Message,
+    me: Me,
+) -> ResponseResult<()> {
     if let Some(result) = db_handler.get_random().await {
-        bot.send_message(msg.chat.id, result.to_html())
-            .link_preview_options(DISABLED_LINK_PREVIEW)
-            .await?;
+        send_result(bot, &msg, me, &result).await?;
     }
     Ok(())
 }
@@ -122,11 +130,29 @@ async fn send_word_of_the_day(
     if let Ok(wotd) = db_handler.get_word_of_the_day().await {
         bot.send_message(
             msg.chat.id,
-            format!("📖 Palabra del día\n\n {}", wotd.to_html().trim()),
+            format!("📖 Palabra del día\n\n {}", wotd.to_html(None).trim()),
         )
         .link_preview_options(DISABLED_LINK_PREVIEW)
         .await?;
     }
+    Ok(())
+}
+
+async fn send_result(bot: DLEBot, msg: &Message, me: Me, word: &DleWord) -> ResponseResult<()> {
+    let deep_link_url = format!(
+        "https://t.me/{}?start={}",
+        me.username(),
+        base64_encode(&word.query)
+    );
+    let rich_message = InputRichMessage {
+        markdown: None,
+        html: Some(word.to_html(Some(&deep_link_url))),
+        is_rtl: None,
+        skip_entity_detection: None,
+    };
+
+    bot.send_rich_message(msg.chat.id, rich_message).await?;
+
     Ok(())
 }
 
@@ -140,31 +166,7 @@ pub async fn send_message(
 ) -> ResponseResult<()> {
     match db_handler.get_exact(text).await {
         Some(result) => {
-            let headword = result.headword().to_string();
-            let html = result.to_html();
-            let deep_link_url = format!(
-                "https://t.me/{}?start={}",
-                me.username(),
-                base64_encode(result.query.clone())
-            );
-
-            for (index, &part) in smart_split(&html, MAX_MASSAGE_LENGTH).iter().enumerate() {
-                let part = if index == 0 {
-                    part.replacen(
-                        &format!("<b>{}</b>", headword),
-                        &format!(
-                            r#"<b><a href="{}">{}</a></b>"#,
-                            deep_link_url, headword
-                        ),
-                        1,
-                    )
-                } else {
-                    part.to_string()
-                };
-                bot.send_message(msg.chat.id, part)
-                    .link_preview_options(DISABLED_LINK_PREVIEW)
-                    .await?;
-            }
+            send_result(bot, &msg, me, &result).await?;
 
             db_handler
                 .add_sent_definition_event(user_id, msg.date.into(), result.query)
@@ -182,7 +184,7 @@ pub async fn send_message(
                         format!(
                             r#"<a href="https://t.me/{}?start={}">{}</a>"#,
                             me.username(),
-                            base64_encode(x.to_string()),
+                            base64_encode(x),
                             x
                         )
                     })
@@ -205,6 +207,7 @@ pub async fn send_message(
                 msg.chat.id,
                 format!(include_str!("templates/not_found.txt"), text, similar_words),
             )
+            .parse_mode(ParseMode::Html)
             .link_preview_options(DISABLED_LINK_PREVIEW)
             .reply_markup(inline_keyboard)
             .await?;
@@ -290,9 +293,7 @@ pub async fn handle_message(
                                 }
                                 return Ok(());
                             }
-                            Ok(AdminCommand::GetSchedule)
-                                if db_handler.is_admin(user_id).await =>
-                            {
+                            Ok(AdminCommand::GetSchedule) if db_handler.is_admin(user_id).await => {
                                 match db_handler.get_word_of_the_day_schedule().await {
                                     Ok(schedule) => {
                                         let mut text = String::new();
@@ -350,23 +351,22 @@ pub async fn handle_message(
                             }
 
                             Ok(Command::Aleatorio) => {
-                                send_random(db_handler, bot, msg).await?;
+                                send_random(db_handler, bot, msg, me).await?;
                             }
 
-                            Ok(Command::Pdd) => {
-                                send_word_of_the_day(db_handler, bot, msg).await?;
-                            }
-
+                            // Ok(Command::Pdd) => {
+                            //     send_word_of_the_day(db_handler, bot, msg).await?;
+                            // }
                             Err(_) => match text {
                                 KEY_RANDOM => {
-                                    send_random(db_handler, bot, msg).await?;
+                                    send_random(db_handler, bot, msg, me).await?;
                                 }
                                 KEY_HELP => {
                                     send_help(bot, msg, me).await?;
                                 }
-                                KEY_WOTD => {
-                                    send_word_of_the_day(db_handler, bot, msg).await?;
-                                }
+                                // KEY_WOTD => {
+                                //     send_word_of_the_day(db_handler, bot, msg).await?;
+                                // }
                                 _ => {
                                     send_message(db_handler, bot, msg, user_id, text, me).await?;
                                 }
@@ -400,7 +400,7 @@ pub async fn handle_edited_message(
 
                 match db_handler.get_exact(text).await {
                     Some(result) => {
-                        let html = result.to_html();
+                        let html = result.to_html(None);
                         for part in smart_split(&html, MAX_MASSAGE_LENGTH) {
                             bot.send_message(
                                 msg.chat.id,
@@ -416,11 +416,11 @@ pub async fn handle_edited_message(
                             .await;
                     }
                     None => {
-                        let url =
-                            match reqwest::Url::parse(&format!("https://dle.rae.es/{}", text)) {
-                                Ok(value) => value,
-                                Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
-                            };
+                        let url = match reqwest::Url::parse(&format!("https://dle.rae.es/{}", text))
+                        {
+                            Ok(value) => value,
+                            Err(_) => reqwest::Url::parse("https://dle.rae.es/").unwrap(),
+                        };
 
                         let inline_keyboard = InlineKeyboardMarkup::new([[
                             InlineKeyboardButton::switch_inline_query_current_chat(
@@ -430,16 +430,12 @@ pub async fn handle_edited_message(
                             InlineKeyboardButton::url("Buscar en dle.rae.es", url),
                         ]]);
 
-                        let not_found =
-                            format!(include_str!("templates/not_found.txt"), text, "");
+                        let not_found = format!(include_str!("templates/not_found.txt"), text, "");
 
-                        bot.send_message(
-                            msg.chat.id,
-                            format!("😐 Así tampoco\n\n{}", not_found),
-                        )
-                        .reply_markup(inline_keyboard)
-                        .reply_parameters(ReplyParameters::new(msg.id))
-                        .await?;
+                        bot.send_message(msg.chat.id, format!("😐 Así tampoco\n\n{}", not_found))
+                            .reply_markup(inline_keyboard)
+                            .reply_parameters(ReplyParameters::new(msg.id))
+                            .await?;
                     }
                 }
             }

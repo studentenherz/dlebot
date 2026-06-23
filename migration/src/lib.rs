@@ -6,6 +6,8 @@ mod m20230610_033154_create_user_table;
 mod m20230610_040548_create_event_table;
 mod m20230611_214244_add_fuzzystrmatch;
 mod m20260619_000001_normalize_schema;
+mod m20260621_000001_relations_homograph;
+mod m20260622_000001_drop_labels;
 
 pub struct Migrator;
 
@@ -19,6 +21,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20230610_040548_create_event_table::Migration),
             Box::new(m20230611_214244_add_fuzzystrmatch::Migration),
             Box::new(m20260619_000001_normalize_schema::Migration),
+            Box::new(m20260621_000001_relations_homograph::Migration),
+            Box::new(m20260622_000001_drop_labels::Migration),
         ]
     }
 }

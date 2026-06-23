@@ -81,7 +81,7 @@ pub fn split_by_whitespace(text: &str, chars_per_string: usize) -> Vec<&str> {
     result
 }
 
-pub fn base64_encode(text: String) -> String {
+pub fn base64_encode(text: &str) -> String {
     CUSTOM_ENGINE.encode(text)
 }
 

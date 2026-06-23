@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::sync::OnceLock;
 
@@ -63,6 +63,7 @@ pub(crate) fn sanitize_html(html: &str) -> String {
     let re = TAG_RE.get_or_init(|| Regex::new(r"</?([a-zA-Z][a-zA-Z0-9-]*)[^>]*>").unwrap());
     let supported = SUPPORTED.get_or_init(|| {
         [
+            // inline formatting
             "a",
             "b",
             "strong",
@@ -73,12 +74,57 @@ pub(crate) fn sanitize_html(html: &str) -> String {
             "s",
             "strike",
             "del",
+            "code",
+            "mark",
+            "sub",
+            // telegram-specific inline
             "tg-spoiler",
             "tg-emoji",
             "tg-time",
-            "code",
+            "tg-reference",
+            // block / structure
             "pre",
             "blockquote",
+            "aside",
+            "cite",
+            "p",
+            "br",
+            "hr",
+            "footer",
+            // headings
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            // lists
+            "ul",
+            "ol",
+            "li",
+            "input",
+            // media
+            "img",
+            "video",
+            "audio",
+            "figure",
+            "figcaption",
+            // telegram media / layout
+            "tg-map",
+            "tg-collage",
+            "tg-slideshow",
+            // table
+            "table",
+            "caption",
+            "tr",
+            "th",
+            "td",
+            // collapsible
+            "details",
+            "summary",
+            // math
+            "tg-math",
+            "tg-math-block",
         ]
         .into_iter()
         .collect()
@@ -94,6 +140,7 @@ pub(crate) fn sanitize_html(html: &str) -> String {
     .into_owned()
 }
 
+#[derive(Debug)]
 pub struct DleWord {
     /// The query string used to look up this word (URL slug).
     pub query: String,
@@ -102,6 +149,7 @@ pub struct DleWord {
     pub entries: Vec<DleEntry>,
 }
 
+#[derive(Debug)]
 pub struct DleEntry {
     pub headword: String,
     pub homograph: Option<i16>,
@@ -110,6 +158,7 @@ pub struct DleEntry {
     pub sense_groups: Vec<DleSenseGroup>,
 }
 
+#[derive(Debug)]
 pub enum DleSenseGroup {
     Main {
         senses: Vec<DleSense>,
@@ -120,28 +169,27 @@ pub enum DleSenseGroup {
     },
 }
 
+#[derive(Debug)]
 pub struct DleSense {
     pub number: Option<i16>,
     pub definition_text: Option<String>,
     pub definition_html: Option<String>,
-    pub labels: Vec<DleLabel>,
     pub examples: Vec<DleExample>,
     pub relations: Vec<DleRelation>,
 }
 
+#[derive(Debug)]
 pub struct DleRelation {
     pub kind: String, // "synonym" | "antonym"
     pub word: String,
+    pub homograph: Option<i16>,
+    #[allow(unused)]
     pub scope: Option<String>,
 }
 
+#[derive(Debug)]
 pub struct DleExample {
     pub text: String,
-}
-
-pub struct DleLabel {
-    pub abbr: String,
-    pub full_text: Option<String>,
 }
 
 fn superscript(n: i16) -> &'static str {
@@ -164,22 +212,19 @@ impl DleWord {
         self.resolved_headword.as_deref().unwrap_or(&self.query)
     }
 
-    pub fn to_html(&self) -> String {
+    pub fn to_html(&self, url: Option<&str>) -> String {
         let mut out = String::new();
         for (i, entry) in self.entries.iter().enumerate() {
             if i > 0 {
                 out.push('\n');
             }
-            entry.write_html(&mut out);
+            entry.write_html(&mut out, url);
         }
         out.trim_end().to_string()
     }
 
     pub fn to_html_with_deeplink(&self, url: &str) -> String {
-        let html = self.to_html();
-        let headword = self.headword();
-        let linked = format!("<b><a href=\"{}\">{}</a></b>", url, headword);
-        html.replacen(&format!("<b>{}</b>", headword), &linked, 1)
+        self.to_html(Some(url))
     }
 
     pub fn to_text(&self) -> String {
@@ -195,9 +240,25 @@ impl DleWord {
 }
 
 impl DleEntry {
-    pub(crate) fn write_html(&self, out: &mut String) {
-        let sup = self.homograph.map(superscript).unwrap_or("");
-        let _ = write!(out, "<b>{}</b>{}", self.headword, sup);
+    pub(crate) fn write_html(&self, out: &mut String, url: Option<&str>) {
+        match (url, self.homograph) {
+            (Some(u), Some(n)) => {
+                let _ = write!(
+                    out,
+                    "<h1><a href=\"{}\">{}</a><sup>{}</sup></h1>",
+                    u, self.headword, n
+                );
+            }
+            (Some(u), None) => {
+                let _ = write!(out, "<h1><a href=\"{}\">{}</a></h1>", u, self.headword);
+            }
+            (None, Some(n)) => {
+                let _ = write!(out, "<h1>{}<sup>{}</sup></h1>", self.headword, n);
+            }
+            (None, None) => {
+                let _ = write!(out, "<h1>{}</h1>", self.headword);
+            }
+        }
 
         let etym = self
             .etymology_html
@@ -206,9 +267,8 @@ impl DleEntry {
             .unwrap_or("")
             .trim();
         if !etym.is_empty() {
-            let _ = write!(out, "\n<i>({})</i>", sanitize_html(etym));
+            let _ = write!(out, "<p>{}</p>", sanitize_html(etym));
         }
-        out.push('\n');
 
         for group in &self.sense_groups {
             group.write_html(out);
@@ -244,11 +304,13 @@ impl DleSenseGroup {
             ..
         } = self
         {
-            let _ = write!(out, "\n<b>{}</b>\n", form);
+            let _ = write!(out, "<p><b>{}</b></p>", form);
         }
+        out.push_str("<ol>");
         for sense in self.senses() {
             sense.write_html(out);
         }
+        out.push_str("</ol>");
     }
 
     fn write_text(&self, out: &mut String) {
@@ -266,53 +328,91 @@ impl DleSenseGroup {
 }
 
 impl DleSense {
+    pub fn sanitized_definition_html(&self) -> Option<String> {
+        static TAG_RE: OnceLock<Regex> = OnceLock::new();
+        static TEXT_FORMATTING_TAGS: OnceLock<HashSet<&'static str>> = OnceLock::new();
+        static REPLACE_BY_TAGS: OnceLock<HashMap<&'static str, &'static str>> = OnceLock::new();
+
+        let re = TAG_RE.get_or_init(|| Regex::new(r"(</?)([a-zA-Z][a-zA-Z0-9-]*)[^>]*>").unwrap());
+        let allowed = TEXT_FORMATTING_TAGS.get_or_init(|| {
+            [
+                "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "mark", "sub", "sup",
+            ]
+            .into_iter()
+            .collect()
+        });
+        let replace_by_tags = REPLACE_BY_TAGS.get_or_init(|| [("abbr", "b")].into_iter().collect());
+
+        self.definition_html.as_deref().map(|html| {
+            re.replace_all(html, |caps: &regex::Captures| {
+                let caputured_tag = caps[2].to_lowercase();
+                if allowed.contains(caputured_tag.as_str()) {
+                    caps[0].to_string()
+                } else if let Some(replacement_tag) = replace_by_tags.get(caputured_tag.as_str()) {
+                    format!("{}{}>", caps[1].to_string(), replacement_tag)
+                } else {
+                    String::new()
+                }
+            })
+            .into_owned()
+        })
+    }
+
     fn write_html(&self, out: &mut String) {
-        if let Some(num) = self.number {
-            let _ = write!(out, "{}. ", num);
+        match self.number {
+            Some(n) => {
+                let _ = write!(out, "<li value=\"{}\">", n);
+            }
+            None => out.push_str("<li>"),
         }
 
-        if !self.labels.is_empty() {
-            let labels: Vec<&str> = self.labels.iter().map(|l| l.abbr.as_str()).collect();
-            let _ = write!(out, "{} ", labels.join(" "));
-        }
-
-        let def = self.definition_text.as_deref().unwrap_or("").trim();
+        let sanitized = self.sanitized_definition_html();
+        let def = sanitized
+            .as_deref()
+            .or(self.definition_text.as_deref())
+            .unwrap_or("")
+            .trim();
         out.push_str(def);
-        out.push('\n');
 
-        for ex in &self.examples {
-            let _ = write!(out, "▸ <i>{}</i>\n", ex.text.trim());
+        if !self.examples.is_empty() {
+            out.push_str("<ul>");
+            for ex in &self.examples {
+                let _ = write!(out, "<li><i>{}</i></li>", ex.text.trim());
+            }
+            out.push_str("</ul>");
         }
 
-        let synonyms: Vec<&str> = self
+        let fmt_html = |r: &DleRelation| match r.homograph {
+            Some(n) => format!("{}<sup>{}</sup>", r.word, n),
+            None => r.word.clone(),
+        };
+
+        let synonyms: Vec<String> = self
             .relations
             .iter()
             .filter(|r| r.kind == "synonym")
-            .map(|r| r.word.as_str())
+            .map(fmt_html)
             .collect();
         if !synonyms.is_empty() {
-            let _ = write!(out, "<i>Sin.:</i> {}\n", synonyms.join(", "));
+            let _ = write!(out, "<p><i>Sin.:</i> {}</p>", synonyms.join(", "));
         }
 
-        let antonyms: Vec<&str> = self
+        let antonyms: Vec<String> = self
             .relations
             .iter()
             .filter(|r| r.kind == "antonym")
-            .map(|r| r.word.as_str())
+            .map(fmt_html)
             .collect();
         if !antonyms.is_empty() {
-            let _ = write!(out, "<i>Ant.:</i> {}\n", antonyms.join(", "));
+            let _ = write!(out, "<p><i>Ant.:</i> {}</p>", antonyms.join(", "));
         }
+
+        out.push_str("</li>");
     }
 
     fn write_text(&self, out: &mut String) {
         if let Some(num) = self.number {
             let _ = write!(out, "{}. ", num);
-        }
-
-        if !self.labels.is_empty() {
-            let labels: Vec<&str> = self.labels.iter().map(|l| l.abbr.as_str()).collect();
-            let _ = write!(out, "{} ", labels.join(" "));
         }
 
         let def = self.definition_text.as_deref().unwrap_or("").trim();
@@ -323,21 +423,26 @@ impl DleSense {
             let _ = write!(out, "▸ {}\n", ex.text.trim());
         }
 
-        let synonyms: Vec<&str> = self
+        let fmt_text = |r: &DleRelation| match r.homograph {
+            Some(n) => format!("{}{}", r.word, superscript(n)),
+            None => r.word.clone(),
+        };
+
+        let synonyms: Vec<String> = self
             .relations
             .iter()
             .filter(|r| r.kind == "synonym")
-            .map(|r| r.word.as_str())
+            .map(fmt_text)
             .collect();
         if !synonyms.is_empty() {
             let _ = write!(out, "Sin.: {}\n", synonyms.join(", "));
         }
 
-        let antonyms: Vec<&str> = self
+        let antonyms: Vec<String> = self
             .relations
             .iter()
             .filter(|r| r.kind == "antonym")
-            .map(|r| r.word.as_str())
+            .map(fmt_text)
             .collect();
         if !antonyms.is_empty() {
             let _ = write!(out, "Ant.: {}\n", antonyms.join(", "));
