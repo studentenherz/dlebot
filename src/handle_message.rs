@@ -122,21 +122,21 @@ async fn send_random(
     Ok(())
 }
 
-async fn send_word_of_the_day(
-    db_handler: DatabaseHandler,
-    bot: DLEBot,
-    msg: Message,
-) -> ResponseResult<()> {
-    if let Ok(wotd) = db_handler.get_word_of_the_day().await {
-        bot.send_message(
-            msg.chat.id,
-            format!("📖 Palabra del día\n\n {}", wotd.to_html(None).trim()),
-        )
-        .link_preview_options(DISABLED_LINK_PREVIEW)
-        .await?;
-    }
-    Ok(())
-}
+// async fn send_word_of_the_day(
+//     db_handler: DatabaseHandler,
+//     bot: DLEBot,
+//     msg: Message,
+// ) -> ResponseResult<()> {
+//     if let Ok(wotd) = db_handler.get_word_of_the_day().await {
+//         bot.send_message(
+//             msg.chat.id,
+//             format!("📖 Palabra del día\n\n {}", wotd.to_html(None).trim()),
+//         )
+//         .link_preview_options(DISABLED_LINK_PREVIEW)
+//         .await?;
+//     }
+//     Ok(())
+// }
 
 async fn send_result(bot: DLEBot, msg: &Message, me: Me, word: &DleWord) -> ResponseResult<()> {
     let deep_link_url = format!(

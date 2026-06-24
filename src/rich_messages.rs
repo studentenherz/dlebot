@@ -2,8 +2,25 @@ use serde::Serialize;
 use teloxide::prelude::*;
 use teloxide::requests::{JsonRequest, Payload};
 use teloxide::types::{
-    InlineQueryResultArticle, InlineQueryResultsButton, Message, Recipient, ReplyParameters, True,
+    InlineQueryResultArticle, Message, Recipient, ReplyParameters, True, WebAppInfo,
 };
+
+/// Flat alternative to teloxide's `InlineQueryResultsButton` that avoids the
+/// flatten+rename_all enum serialization issue with serde_with.
+#[derive(Clone, Serialize)]
+pub struct InlineQueryButton {
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_parameter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub web_app: Option<WebAppInfo>,
+}
+
+impl InlineQueryButton {
+    pub fn start_parameter(text: impl Into<String>, param: impl Into<String>) -> Self {
+        Self { text: text.into(), start_parameter: Some(param.into()), web_app: None }
+    }
+}
 
 #[derive(Clone, Serialize)]
 pub struct InputRichMessage {
@@ -96,7 +113,7 @@ pub struct AnswerInlineQueryRich {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next_offset: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub button: Option<InlineQueryResultsButton>,
+    pub button: Option<InlineQueryButton>,
 }
 
 impl Payload for AnswerInlineQueryRich {

@@ -1,13 +1,13 @@
 use teloxide::{
     prelude::*,
-    types::{InlineQueryResultArticle, InlineQueryResultsButton, InlineQueryResultsButtonKind, Me},
+    types::{InlineQueryResultArticle, Me},
 };
 
 use crate::{
     database::DatabaseHandler,
     rich_messages::{
-        InlineQueryResultArticleExt, InputRichMessage, InputRichMessageContent, RichInlineQueryExt,
-        RichInlineQueryResultArticle,
+        InlineQueryButton, InlineQueryResultArticleExt, InputRichMessage, InputRichMessageContent,
+        RichInlineQueryExt, RichInlineQueryResultArticle,
     },
     utils::{base64_encode, smart_split, MAX_MASSAGE_LENGTH},
     DLEBot,
@@ -71,10 +71,10 @@ pub async fn handle_inline(
 
     let mut req = bot.answer_inline_query_rich(q.id, results);
     if req.results.is_empty() {
-        req.button = Some(InlineQueryResultsButton {
-            text: "No se han encontrado resultados".to_string(),
-            kind: InlineQueryResultsButtonKind::StartParameter(base64_encode(&q.query)),
-        });
+        req.button = Some(InlineQueryButton::start_parameter(
+            "No se han encontrado resultados",
+            base64_encode(&q.query),
+        ));
     }
     req.await?;
 
