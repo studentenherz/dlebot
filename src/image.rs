@@ -4,6 +4,7 @@ use ::teloxide::{prelude::*, types::InputFile};
 use chrono::{offset::Local, Datelike};
 use rand::Rng;
 use regex::Regex;
+use teloxide::types::ParseMode;
 use usvg::{fontdb, TreeParsing, TreeTextToPath};
 
 use crate::{
@@ -164,7 +165,12 @@ pub async fn send_image(
         bot_me.username(),
         base64_encode(&word.query)
     );
-    let caption = word.to_html_with_deeplink(&deep_link_url);
+    let caption = word.to_text();
+    let caption = caption.replacen(
+        &word.query,
+        &format!(r#"<a href="{}">{}</a>"#, deep_link_url, word.query),
+        1,
+    );
 
     let mut channel = String::new();
     if let Ok(chat) = bot.get_chat(chat_id).await {
@@ -182,6 +188,7 @@ pub async fn send_image(
                 if pdd { "📖 #PalabraDelDía |" } else { "" },
                 caption.trim()
             ))
+            .parse_mode(ParseMode::Html)
             .await?;
     }
 
