@@ -146,7 +146,7 @@ async fn send_result(bot: DLEBot, msg: &Message, me: Me, word: &DleWord) -> Resp
     );
     let rich_message = InputRichMessage {
         markdown: None,
-        html: Some(word.to_html(Some(&deep_link_url))),
+        html: Some(word.to_html_with_deeplink(&deep_link_url)),
         is_rtl: None,
         skip_entity_detection: None,
     };

@@ -34,7 +34,7 @@ pub async fn handle_inline(
             me.username(),
             base64_encode(&word.query)
         );
-        let html = word.to_html(Some(&deep_link_url));
+        let html = word.to_html_with_deeplink(&deep_link_url);
         let text = word.to_text();
 
         let html_parts = smart_split(&html, MAX_MASSAGE_LENGTH);
