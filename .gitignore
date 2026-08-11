@@ -3,3 +3,6 @@ target
 .vscode
 pgdata
 *.service
+*.dump
+*.sql
+*.sql.gz
