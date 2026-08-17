@@ -2,8 +2,11 @@ use serde::Serialize;
 use teloxide::prelude::*;
 use teloxide::requests::{JsonRequest, Payload};
 use teloxide::types::{
-    InlineQueryResultArticle, Message, Recipient, ReplyParameters, True, WebAppInfo,
+    InlineQueryResultArticle, LinkPreviewOptions, Message, Recipient, ReplyParameters, True,
+    WebAppInfo,
 };
+
+use crate::utils::DISABLED_LINK_PREVIEW;
 
 /// Flat alternative to teloxide's `InlineQueryResultsButton` that avoids the
 /// flatten+rename_all enum serialization issue with serde_with.
@@ -45,19 +48,92 @@ impl InputRichMessageContent {
     }
 }
 
+/// Flat alternative to teloxide's `InputMessageContent::Text`, so that inline
+/// results can carry a classic HTML message for users who prefer it.
+#[derive(Clone, Serialize)]
+pub struct InputTextMessageContent {
+    pub message_text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parse_mode: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link_preview_options: Option<LinkPreviewOptions>,
+}
+
+impl InputTextMessageContent {
+    pub fn html(message_text: impl Into<String>) -> Self {
+        Self {
+            message_text: message_text.into(),
+            parse_mode: Some("HTML"),
+            link_preview_options: Some(DISABLED_LINK_PREVIEW),
+        }
+    }
+}
+
+/// Content of an inline result: rich message or classic HTML one.
+#[derive(Clone, Serialize)]
+#[serde(untagged)]
+pub enum InputMessageContent {
+    Rich(InputRichMessageContent),
+    Text(InputTextMessageContent),
+}
+
+impl From<InputRichMessageContent> for InputMessageContent {
+    fn from(value: InputRichMessageContent) -> Self {
+        Self::Rich(value)
+    }
+}
+
+impl From<InputTextMessageContent> for InputMessageContent {
+    fn from(value: InputTextMessageContent) -> Self {
+        Self::Text(value)
+    }
+}
+
+/// Minimal inline keyboard for the hand-rolled payloads below; teloxide's own
+/// types hit the same flatten+rename_all serialization issue as the button above.
+#[derive(Clone, Serialize)]
+pub struct RichInlineKeyboardButton {
+    pub text: String,
+    pub callback_data: String,
+}
+
+impl RichInlineKeyboardButton {
+    pub fn callback(text: impl Into<String>, callback_data: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            callback_data: callback_data.into(),
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
+pub struct RichInlineKeyboardMarkup {
+    pub inline_keyboard: Vec<Vec<RichInlineKeyboardButton>>,
+}
+
+impl RichInlineKeyboardMarkup {
+    pub fn new(inline_keyboard: Vec<Vec<RichInlineKeyboardButton>>) -> Self {
+        Self { inline_keyboard }
+    }
+}
+
 #[derive(Clone, Serialize)]
 pub struct RichInlineQueryResultArticle {
     #[serde(rename = "type")]
     result_type: &'static str,
     pub id: String,
     pub title: String,
-    pub input_message_content: InputRichMessageContent,
+    pub input_message_content: InputMessageContent,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 }
 
 impl RichInlineQueryResultArticle {
-    pub fn new<S1, S2>(id: S1, title: S2, input_message_content: InputRichMessageContent) -> Self
+    pub fn new<S1, S2>(
+        id: S1,
+        title: S2,
+        input_message_content: impl Into<InputMessageContent>,
+    ) -> Self
     where
         S1: Into<String>,
         S2: Into<String>,
@@ -66,7 +142,7 @@ impl RichInlineQueryResultArticle {
             result_type: "article",
             id: id.into(),
             title: title.into(),
-            input_message_content,
+            input_message_content: input_message_content.into(),
             description: None,
         }
     }
@@ -81,7 +157,7 @@ pub trait InlineQueryResultArticleExt {
     fn new_with_rich_message<S1, S2>(
         id: S1,
         title: S2,
-        content: InputRichMessageContent,
+        content: impl Into<InputMessageContent>,
     ) -> RichInlineQueryResultArticle
     where
         S1: Into<String>,
@@ -92,7 +168,7 @@ impl InlineQueryResultArticleExt for InlineQueryResultArticle {
     fn new_with_rich_message<S1, S2>(
         id: S1,
         title: S2,
-        content: InputRichMessageContent,
+        content: impl Into<InputMessageContent>,
     ) -> RichInlineQueryResultArticle
     where
         S1: Into<String>,
@@ -164,6 +240,8 @@ pub struct SendRichMessage {
     pub protect_content: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reply_parameters: Option<ReplyParameters>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reply_markup: Option<RichInlineKeyboardMarkup>,
     // add the remaining optional fields the same way as you need them
 }
 
@@ -197,6 +275,7 @@ impl RichMessageExt for Bot {
                 disable_notification: None,
                 protect_content: None,
                 reply_parameters: None,
+                reply_markup: None,
             },
         )
     }

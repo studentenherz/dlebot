@@ -11,6 +11,7 @@ pub struct Model {
     pub blocked: bool,
     pub in_bot: bool,
     pub admin: bool,
+    pub rich_text: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

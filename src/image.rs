@@ -9,7 +9,7 @@ use usvg::{fontdb, TreeParsing, TreeTextToPath};
 
 use crate::{
     dle_ir::{sanitize_html, DleWord},
-    utils::{base64_encode, split_by_whitespace},
+    utils::{deep_link, split_by_whitespace},
     DLEBot,
 };
 
@@ -160,11 +160,7 @@ pub async fn send_image(
     }
 
     let bot_me = bot.get_me().await.unwrap();
-    let deep_link_url = format!(
-        "https://t.me/{}?start={}",
-        bot_me.username(),
-        base64_encode(&word.query)
-    );
+    let deep_link_url = deep_link(bot_me.username(), &word.query);
     let caption = word.to_text();
     let caption = caption.replacen(
         &word.query,

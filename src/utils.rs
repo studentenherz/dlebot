@@ -6,8 +6,6 @@ use base64::{
 use teloxide::types::LinkPreviewOptions;
 
 pub const MAX_MASSAGE_LENGTH: usize = 4096;
-pub const SUBS_CALLBACK_DATA: &str = "__subs";
-pub const DESUBS_CALLBACK_DATA: &str = "__desubs";
 const CUSTOM_ENGINE: engine::GeneralPurpose =
     engine::GeneralPurpose::new(&alphabet::URL_SAFE, general_purpose::NO_PAD);
 pub const DISABLED_LINK_PREVIEW: LinkPreviewOptions = LinkPreviewOptions {
@@ -93,6 +91,14 @@ pub fn base64_decode(text: String) -> Result<String, &'static str> {
     }
 
     Err("Error decoding")
+}
+
+pub fn deep_link(bot_username: &str, payload: &str) -> String {
+    format!(
+        "https://t.me/{}?start={}",
+        bot_username,
+        base64_encode(payload)
+    )
 }
 
 #[test]

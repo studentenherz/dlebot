@@ -1,0 +1,8 @@
+⚙️ <b>Ajustes</b>
+
+{}, aquí puedes configurar cómo te responde el bot. Estos ajustes solo se aplican a ti.
+
+<b>Formato de las definiciones:</b> {}
+<i>{}</i>
+
+Si no sabes cuál elegir, toca <a href="{}">acá</a> y te enviaré un ejemplo del formato enriquecido.

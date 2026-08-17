@@ -8,6 +8,7 @@ mod m20230611_214244_add_fuzzystrmatch;
 mod m20260619_000001_normalize_schema;
 mod m20260621_000001_relations_homograph;
 mod m20260622_000001_drop_labels;
+mod m20260815_000001_add_user_settings;
 
 pub struct Migrator;
 
@@ -23,6 +24,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260619_000001_normalize_schema::Migration),
             Box::new(m20260621_000001_relations_homograph::Migration),
             Box::new(m20260622_000001_drop_labels::Migration),
+            Box::new(m20260815_000001_add_user_settings::Migration),
         ]
     }
 }

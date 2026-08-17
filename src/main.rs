@@ -7,6 +7,7 @@ mod handle_inline;
 mod handle_message;
 mod image;
 mod rich_messages;
+mod settings;
 mod utils;
 mod word_of_the_day;
 

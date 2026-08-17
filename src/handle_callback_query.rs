@@ -1,90 +1,119 @@
 use teloxide::{
+    payloads::EditMessageTextSetters,
     prelude::*,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, MaybeInaccessibleMessage, User},
+    types::{MaybeInaccessibleMessage, Me, ParseMode},
 };
 
 use crate::{
     database::DatabaseHandler,
-    utils::{DESUBS_CALLBACK_DATA, SUBS_CALLBACK_DATA},
+    settings::{
+        settings_keyboard, settings_text, MessageFormat, UserSettings,
+        FORMAT_CLASSIC_CALLBACK_DATA, FORMAT_RICH_CALLBACK_DATA, FORMAT_RICH_DEMO_CALLBACK_DATA,
+    },
+    utils::DISABLED_LINK_PREVIEW,
     DLEBot,
 };
+
+/// Store the chosen format. When the button came from the settings menu, the
+/// menu is rewritten to show the new one; the rich sample is left as it is.
+async fn set_format(
+    db_handler: DatabaseHandler,
+    bot: DLEBot,
+    query: CallbackQuery,
+    format: MessageFormat,
+    bot_username: &str,
+    from_demo: bool,
+) -> ResponseResult<()> {
+    let user_id = match query.from.id.0.try_into() {
+        Ok(user_id) => user_id,
+        Err(_) => return Ok(()),
+    };
+
+    let settings = UserSettings { format };
+    let already_set = db_handler.get_settings(user_id).await == settings;
+
+    bot.answer_callback_query(query.id.clone())
+        .text(match (already_set, format) {
+            (true, MessageFormat::Rich) => "Ya usas el formato enriquecido",
+            (true, MessageFormat::Classic) => "Ya usas el formato clásico",
+            (false, MessageFormat::Rich) => "Formato enriquecido activado",
+            (false, MessageFormat::Classic) => "Formato clásico activado",
+        })
+        .await?;
+
+    if already_set {
+        return Ok(());
+    }
+
+    db_handler.set_message_format(user_id, format).await;
+    db_handler
+        .add_callback_query_event(user_id, query.data.clone().unwrap_or_default())
+        .await;
+
+    if from_demo {
+        return Ok(());
+    }
+
+    if let Some(MaybeInaccessibleMessage::Regular(message)) = query.message {
+        bot.edit_message_text(
+            message.chat.id,
+            message.id,
+            settings_text(bot_username, &query.from.first_name, settings),
+        )
+        .parse_mode(ParseMode::Html)
+        .link_preview_options(DISABLED_LINK_PREVIEW)
+        .reply_markup(settings_keyboard())
+        .await?;
+    }
+
+    Ok(())
+}
 
 pub async fn handle_callback_query(
     db_handler: DatabaseHandler,
     bot: DLEBot,
     query: CallbackQuery,
+    me: Me,
 ) -> ResponseResult<()> {
-    if let Ok(user_id) = query.from.id.0.try_into() {
-        async fn edit_message(
-            subscribed: bool,
-            message: Message,
-            user: User,
-            bot: DLEBot,
-        ) -> ResponseResult<()> {
-            let inline_keyboard = InlineKeyboardMarkup::new([[InlineKeyboardButton::callback(
-                if subscribed {
-                    "Desuscribirme"
-                } else {
-                    "¡Suscribirme!"
-                },
-                if subscribed {
-                    DESUBS_CALLBACK_DATA
-                } else {
-                    SUBS_CALLBACK_DATA
-                },
-            )]]);
+    let data = query.data.clone().unwrap_or_default();
 
-            let chat_id = message.chat.id;
-            let message_id = message.id;
-
-            bot.clone()
-                .edit_message_text(
-                    chat_id,
-                    message_id,
-                    format!(
-                        include_str!("templates/subscription.txt"),
-                        user.first_name,
-                        if subscribed { "SÍ" } else { "NO" }
-                    ),
-                )
-                .await?;
-
-            bot.edit_message_reply_markup(chat_id, message_id)
-                .reply_markup(inline_keyboard)
-                .await?;
-
-            Ok(())
+    match data.as_str() {
+        FORMAT_RICH_CALLBACK_DATA => {
+            set_format(
+                db_handler,
+                bot,
+                query,
+                MessageFormat::Rich,
+                me.username(),
+                false,
+            )
+            .await?;
         }
-
-        match query.data.as_deref() {
-            Some(SUBS_CALLBACK_DATA) => {
-                bot.answer_callback_query(query.id.clone())
-                    .text("✅ ¡Te has suscrito!")
-                    .await?;
-                if let Some(MaybeInaccessibleMessage::Regular(message)) = query.message {
-                    edit_message(true, message, query.from, bot).await?;
-                }
-                db_handler.set_subscribed(user_id, true).await;
-                db_handler
-                    .add_callback_query_event(user_id, SUBS_CALLBACK_DATA.to_string())
-                    .await;
-            }
-            Some(DESUBS_CALLBACK_DATA) => {
-                bot.answer_callback_query(query.id)
-                    .text("❌ Te has desuscrito.")
-                    .await?;
-                if let Some(MaybeInaccessibleMessage::Regular(message)) = query.message {
-                    edit_message(false, message, query.from, bot).await?;
-                }
-                db_handler.set_subscribed(user_id, false).await;
-                db_handler
-                    .add_callback_query_event(user_id, DESUBS_CALLBACK_DATA.to_string())
-                    .await;
-            }
-            _ => {
-                bot.answer_callback_query(&query.id).await?;
-                log::warn!("Unrecognized callback query: {:?}", query);
-            }
+        FORMAT_CLASSIC_CALLBACK_DATA => {
+            set_format(
+                db_handler,
+                bot,
+                query,
+                MessageFormat::Classic,
+                me.username(),
+                false,
+            )
+            .await?;
+        }
+        FORMAT_RICH_DEMO_CALLBACK_DATA => {
+            set_format(
+                db_handler,
+                bot,
+                query,
+                MessageFormat::Rich,
+                me.username(),
+                true,
+            )
+            .await?;
+        }
+        _ => {
+            bot.answer_callback_query(&query.id).await?;
+            log::warn!("Unrecognized callback query: {:?}", query);
         }
     }
 

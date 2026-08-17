@@ -3,8 +3,8 @@ use teloxide::{
     payloads::SendMessageSetters,
     prelude::*,
     types::{
-        InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me, ParseMode,
-        ReplyParameters,
+        InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Me, MessageId,
+        ParseMode, ReplyParameters,
     },
     utils::command::{BotCommands, ParseError},
 };
@@ -15,7 +15,13 @@ use crate::{
     dle_ir::DleWord,
     image::send_image,
     rich_messages::{InputRichMessage, RichMessageExt},
-    utils::{base64_decode, base64_encode, smart_split, DISABLED_LINK_PREVIEW, MAX_MASSAGE_LENGTH},
+    settings::{
+        send_format_demo, send_settings, MessageFormat, UserSettings, START_DEMO, START_SETTINGS,
+    },
+    utils::{
+        base64_decode, deep_link, smart_split, DISABLED_LINK_PREVIEW,
+        MAX_MASSAGE_LENGTH,
+    },
     DLEBot,
 };
 
@@ -30,6 +36,8 @@ enum Command {
     Ayuda,
     #[command(description = "Buscar término aleatorio")]
     Aleatorio,
+    #[command(description = "Configurar el bot")]
+    Ajustes,
     // #[command(description = "Mostrar la «Palabra del día»")]
     // Pdd,
 }
@@ -71,11 +79,13 @@ pub async fn set_commands(bot: DLEBot) -> ResponseResult<()> {
 const KEY_RANDOM: &str = "🎲 Palabra aleatoria";
 // const KEY_WOTD: &str = "📖 Palabra del día";
 const KEY_HELP: &str = "❔ Ayuda";
+const KEY_SETTINGS: &str = "⚙️ Ajustes";
 
 async fn send_start(bot: DLEBot, msg: Message) -> ResponseResult<()> {
     let keyboard = KeyboardMarkup::new([[
         KeyboardButton::new(KEY_RANDOM),
         KeyboardButton::new(KEY_HELP),
+        KeyboardButton::new(KEY_SETTINGS),
         // KeyboardButton::new(KEY_WOTD),
     ]])
     // .append_row([KeyboardButton::new(KEY_HELP)])
@@ -115,9 +125,10 @@ async fn send_random(
     bot: DLEBot,
     msg: Message,
     me: Me,
+    settings: UserSettings,
 ) -> ResponseResult<()> {
     if let Some(result) = db_handler.get_random().await {
-        send_result(bot, &msg, me, &result).await?;
+        send_result(bot, &msg, me, &result, settings).await?;
     }
     Ok(())
 }
@@ -138,22 +149,76 @@ async fn send_random(
 //     Ok(())
 // }
 
-async fn send_result(bot: DLEBot, msg: &Message, me: Me, word: &DleWord) -> ResponseResult<()> {
-    let deep_link_url = format!(
-        "https://t.me/{}?start={}",
-        me.username(),
-        base64_encode(&word.query)
-    );
-    let rich_message = InputRichMessage {
-        markdown: None,
-        html: Some(word.to_html_with_deeplink(&deep_link_url)),
-        is_rtl: None,
-        skip_entity_detection: None,
-    };
+/// Send `word` in the format the user chose in their settings, optionally
+/// prefixed with a line of text and replying to a message.
+async fn send_definition(
+    bot: DLEBot,
+    chat_id: ChatId,
+    word: &DleWord,
+    deep_link_url: &str,
+    settings: UserSettings,
+    prefix: Option<&str>,
+    reply_to: Option<MessageId>,
+) -> ResponseResult<()> {
+    match settings.format {
+        MessageFormat::Rich => {
+            let html = match prefix {
+                Some(prefix) => format!(
+                    "<p>{}</p>{}",
+                    prefix,
+                    word.to_html_with_deeplink(deep_link_url)
+                ),
+                None => word.to_html_with_deeplink(deep_link_url),
+            };
 
-    bot.send_rich_message(msg.chat.id, rich_message).await?;
+            let mut request = bot.send_rich_message(
+                chat_id,
+                InputRichMessage {
+                    markdown: None,
+                    html: Some(html),
+                    is_rtl: None,
+                    skip_entity_detection: None,
+                },
+            );
+            if let Some(message_id) = reply_to {
+                request.reply_parameters = Some(ReplyParameters::new(message_id));
+            }
+            request.await?;
+        }
+
+        MessageFormat::Classic => {
+            let html = word.to_classic_html(Some(deep_link_url));
+            let html = match prefix {
+                Some(prefix) => format!("{}\n\n{}", prefix, html),
+                None => html,
+            };
+
+            for part in smart_split(&html, MAX_MASSAGE_LENGTH) {
+                let mut request = bot
+                    .send_message(chat_id, part.trim())
+                    .parse_mode(ParseMode::Html)
+                    .link_preview_options(DISABLED_LINK_PREVIEW);
+                if let Some(message_id) = reply_to {
+                    request = request.reply_parameters(ReplyParameters::new(message_id));
+                }
+                request.await?;
+            }
+        }
+    }
 
     Ok(())
+}
+
+async fn send_result(
+    bot: DLEBot,
+    msg: &Message,
+    me: Me,
+    word: &DleWord,
+    settings: UserSettings,
+) -> ResponseResult<()> {
+    let deep_link_url = deep_link(me.username(), &word.query);
+
+    send_definition(bot, msg.chat.id, word, &deep_link_url, settings, None, None).await
 }
 
 pub async fn send_message(
@@ -163,10 +228,11 @@ pub async fn send_message(
     user_id: i64,
     text: &str,
     me: Me,
+    settings: UserSettings,
 ) -> ResponseResult<()> {
     match db_handler.get_exact(text).await {
         Some(result) => {
-            send_result(bot, &msg, me, &result).await?;
+            send_result(bot, &msg, me, &result, settings).await?;
 
             db_handler
                 .add_sent_definition_event(user_id, msg.date.into(), result.query)
@@ -180,14 +246,7 @@ pub async fn send_message(
             } else {
                 let list = fuzzy_list
                     .iter()
-                    .map(|x| {
-                        format!(
-                            r#"<a href="https://t.me/{}?start={}">{}</a>"#,
-                            me.username(),
-                            base64_encode(x),
-                            x
-                        )
-                    })
+                    .map(|x| format!(r#"<a href="{}">{}</a>"#, deep_link(me.username(), x), x))
                     .collect::<Vec<String>>()
                     .join("\n— ");
                 format!("Estas son algunas entradas parecidas:\n\n— {}", list)
@@ -322,6 +381,8 @@ pub async fn handle_message(
                             _ => {}
                         }
 
+                        let settings = db_handler.get_settings(user_id).await;
+
                         match BotCommands::parse(text, me.username()) {
                             Ok(Command::Start(start_parameter)) => {
                                 match base64_decode(start_parameter.clone()) {
@@ -329,9 +390,23 @@ pub async fn handle_message(
                                         "" => {
                                             send_start(bot, msg).await?;
                                         }
+                                        START_SETTINGS => {
+                                            send_settings(
+                                                me.username(),
+                                                &bot,
+                                                msg.chat.id,
+                                                &user.first_name,
+                                                settings,
+                                            )
+                                            .await?;
+                                        }
+                                        START_DEMO => {
+                                            send_format_demo(&bot, msg.chat.id).await?;
+                                        }
                                         _ => {
                                             send_message(
                                                 db_handler, bot, msg, user_id, &decoded, me,
+                                                settings,
                                             )
                                             .await?;
                                         }
@@ -351,7 +426,18 @@ pub async fn handle_message(
                             }
 
                             Ok(Command::Aleatorio) => {
-                                send_random(db_handler, bot, msg, me).await?;
+                                send_random(db_handler, bot, msg, me, settings).await?;
+                            }
+
+                            Ok(Command::Ajustes) => {
+                                send_settings(
+                                    me.username(),
+                                    &bot,
+                                    msg.chat.id,
+                                    &user.first_name,
+                                    settings,
+                                )
+                                .await?;
                             }
 
                             // Ok(Command::Pdd) => {
@@ -359,16 +445,27 @@ pub async fn handle_message(
                             // }
                             Err(_) => match text {
                                 KEY_RANDOM => {
-                                    send_random(db_handler, bot, msg, me).await?;
+                                    send_random(db_handler, bot, msg, me, settings).await?;
                                 }
                                 KEY_HELP => {
                                     send_help(bot, msg, me).await?;
+                                }
+                                KEY_SETTINGS => {
+                                    send_settings(
+                                        me.username(),
+                                        &bot,
+                                        msg.chat.id,
+                                        &user.first_name,
+                                        settings,
+                                    )
+                                    .await?;
                                 }
                                 // KEY_WOTD => {
                                 //     send_word_of_the_day(db_handler, bot, msg).await?;
                                 // }
                                 _ => {
-                                    send_message(db_handler, bot, msg, user_id, text, me).await?;
+                                    send_message(db_handler, bot, msg, user_id, text, me, settings)
+                                        .await?;
                                 }
                             },
                         };
@@ -384,6 +481,7 @@ pub async fn handle_edited_message(
     db_handler: DatabaseHandler,
     bot: DLEBot,
     msg: Message,
+    me: Me,
 ) -> ResponseResult<()> {
     if let Some(user) = msg.clone().from {
         if let Ok(user_id) = user.id.0.try_into() {
@@ -400,16 +498,19 @@ pub async fn handle_edited_message(
 
                 match db_handler.get_exact(text).await {
                     Some(result) => {
-                        let html = result.to_html(None);
-                        for part in smart_split(&html, MAX_MASSAGE_LENGTH) {
-                            bot.send_message(
-                                msg.chat.id,
-                                format!("😌 ¡Ahora sí!\n\n{}", part.trim()),
-                            )
-                            .reply_parameters(ReplyParameters::new(msg.id))
-                            .link_preview_options(DISABLED_LINK_PREVIEW)
-                            .await?;
-                        }
+                        let settings = db_handler.get_settings(user_id).await;
+                        let deep_link_url = deep_link(me.username(), &result.query);
+
+                        send_definition(
+                            bot.clone(),
+                            msg.chat.id,
+                            &result,
+                            &deep_link_url,
+                            settings,
+                            Some("😌 ¡Ahora sí!"),
+                            Some(msg.id),
+                        )
+                        .await?;
 
                         db_handler
                             .add_sent_definition_event(user_id, msg.date.into(), result.query)

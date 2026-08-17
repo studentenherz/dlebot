@@ -140,6 +140,72 @@ pub(crate) fn sanitize_html(html: &str) -> String {
     .into_owned()
 }
 
+/// Sanitize an HTML fragment for classic `parse_mode=HTML` messages, which
+/// accept a much smaller set of tags than rich messages do.
+pub(crate) fn sanitize_classic_html(html: &str) -> String {
+    static SUP_RE: OnceLock<Regex> = OnceLock::new();
+    static TAG_RE: OnceLock<Regex> = OnceLock::new();
+    static SUPPORTED: OnceLock<HashSet<&'static str>> = OnceLock::new();
+    static REPLACE_BY_TAGS: OnceLock<HashMap<&'static str, &'static str>> = OnceLock::new();
+
+    let sup_re = SUP_RE.get_or_init(|| Regex::new(r"(?i)<sup>(.*?)</sup>").unwrap());
+    let html = sup_re.replace_all(html, |caps: &regex::Captures| {
+        caps[1].chars().map(to_superscript_char).collect::<String>()
+    });
+
+    let re = TAG_RE.get_or_init(|| Regex::new(r"(</?)([a-zA-Z][a-zA-Z0-9-]*)[^>]*>").unwrap());
+    let supported = SUPPORTED.get_or_init(|| {
+        [
+            "a",
+            "b",
+            "strong",
+            "i",
+            "em",
+            "u",
+            "ins",
+            "s",
+            "strike",
+            "del",
+            "code",
+            "pre",
+            "blockquote",
+            "tg-spoiler",
+        ]
+        .into_iter()
+        .collect()
+    });
+    let replace_by_tags = REPLACE_BY_TAGS.get_or_init(|| [("abbr", "b")].into_iter().collect());
+
+    re.replace_all(html.as_ref(), |caps: &regex::Captures| {
+        let tag = caps[2].to_lowercase();
+        if supported.contains(tag.as_str()) {
+            caps[0].to_string()
+        } else if let Some(replacement) = replace_by_tags.get(tag.as_str()) {
+            format!("{}{}>", &caps[1], replacement)
+        } else {
+            String::new()
+        }
+    })
+    .into_owned()
+}
+
+/// Escape plain text that is about to be embedded in classic HTML.
+fn escape_html(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+/// Wrap in `<i>` unless the fragment already carries italics, since Telegram
+/// rejects identically nested entities.
+fn italicize(html: &str) -> String {
+    if html.contains("<i>") || html.contains("<em>") {
+        html.to_string()
+    } else {
+        format!("<i>{}</i>", html)
+    }
+}
+
 #[derive(Debug)]
 pub struct DleWord {
     /// The query string used to look up this word (URL slug).
@@ -227,6 +293,19 @@ impl DleWord {
         self.to_html(Some(url))
     }
 
+    /// Render for `sendMessage` with `parse_mode=HTML`: same content as
+    /// [`Self::to_html`], but using only the tags the Bot API supports.
+    pub fn to_classic_html(&self, url: Option<&str>) -> String {
+        let mut out = String::new();
+        for (i, entry) in self.entries.iter().enumerate() {
+            if i > 0 {
+                out.push('\n');
+            }
+            entry.write_classic_html(&mut out, url);
+        }
+        out.trim_end().to_string()
+    }
+
     pub fn to_text(&self) -> String {
         let mut out = String::new();
         for (i, entry) in self.entries.iter().enumerate() {
@@ -275,6 +354,30 @@ impl DleEntry {
         }
     }
 
+    pub(crate) fn write_classic_html(&self, out: &mut String, url: Option<&str>) {
+        let escaped_headword = escape_html(&self.headword);
+        let headword = match url {
+            Some(u) => format!("<a href=\"{}\">{}</a>", u, escaped_headword),
+            None => escaped_headword,
+        };
+        let sup = self.homograph.map(superscript).unwrap_or("");
+        let _ = writeln!(out, "<b>{}</b>{}", headword, sup);
+
+        let etym = match self.etymology_html.as_deref() {
+            Some(html) => sanitize_classic_html(html),
+            None => escape_html(self.etymology_text.as_deref().unwrap_or("")),
+        };
+        let etym = etym.trim();
+        if !etym.is_empty() {
+            let _ = writeln!(out, "{}", italicize(etym));
+        }
+        out.push('\n');
+
+        for group in &self.sense_groups {
+            group.write_classic_html(out);
+        }
+    }
+
     pub(crate) fn write_text(&self, out: &mut String) {
         let sup = self.homograph.map(superscript).unwrap_or("");
         let _ = write!(out, "{}{}", self.headword, sup);
@@ -313,6 +416,20 @@ impl DleSenseGroup {
         out.push_str("</ol>");
     }
 
+    fn write_classic_html(&self, out: &mut String) {
+        if let Self::ComplexForm {
+            form_text: Some(form),
+            ..
+        } = self
+        {
+            let _ = writeln!(out, "<b>{}</b>", escape_html(form));
+        }
+        for sense in self.senses() {
+            sense.write_classic_html(out);
+        }
+        out.push('\n');
+    }
+
     fn write_text(&self, out: &mut String) {
         if let Self::ComplexForm {
             form_text: Some(form),
@@ -324,6 +441,74 @@ impl DleSenseGroup {
         for sense in self.senses() {
             sense.write_text(out);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn word() -> DleWord {
+        DleWord {
+            query: "prueba".to_string(),
+            resolved_headword: None,
+            entries: vec![DleEntry {
+                headword: "prueba".to_string(),
+                homograph: Some(1),
+                etymology_text: Some("Del lat. proba & probāre.".to_string()),
+                etymology_html: None,
+                sense_groups: vec![DleSenseGroup::Main {
+                    senses: vec![DleSense {
+                        number: Some(1),
+                        definition_text: Some("Acción de probar.".to_string()),
+                        definition_html: Some(
+                            "<abbr title=\"femenino\">f.</abbr> Acción de probar<sup>2</sup>."
+                                .to_string(),
+                        ),
+                        examples: vec![DleExample {
+                            text: "A > B".to_string(),
+                        }],
+                        relations: vec![DleRelation {
+                            kind: "synonym".to_string(),
+                            word: "ensayo".to_string(),
+                            homograph: Some(2),
+                            scope: None,
+                        }],
+                    }],
+                }],
+            }],
+        }
+    }
+
+    #[test]
+    fn classic_html_uses_only_supported_tags() {
+        let html = word().to_classic_html(Some("https://t.me/bot?start=cHJ1ZWJh"));
+
+        assert_eq!(
+            html,
+            "<b><a href=\"https://t.me/bot?start=cHJ1ZWJh\">prueba</a></b>¹\n\
+             <i>Del lat. proba &amp; probāre.</i>\n\
+             \n\
+             <b>1.</b> <b>f.</b> Acción de probar².\n\
+             ▸ <i>A &gt; B</i>\n\
+             <i>Sin.:</i> ensayo²"
+        );
+    }
+
+    #[test]
+    fn classic_html_falls_back_to_plain_text_escaped() {
+        let mut word = word();
+        word.entries[0].sense_groups = vec![DleSenseGroup::Main {
+            senses: vec![DleSense {
+                number: None,
+                definition_text: Some("Uno < dos".to_string()),
+                definition_html: None,
+                examples: vec![],
+                relations: vec![],
+            }],
+        }];
+
+        assert!(word.to_classic_html(None).contains("Uno &lt; dos"));
     }
 }
 
@@ -349,7 +534,7 @@ impl DleSense {
                 if allowed.contains(caputured_tag.as_str()) {
                     caps[0].to_string()
                 } else if let Some(replacement_tag) = replace_by_tags.get(caputured_tag.as_str()) {
-                    format!("{}{}>", caps[1].to_string(), replacement_tag)
+                    format!("{}{}>", &caps[1], replacement_tag)
                 } else {
                     String::new()
                 }
@@ -410,6 +595,47 @@ impl DleSense {
         out.push_str("</li>");
     }
 
+    fn write_classic_html(&self, out: &mut String) {
+        if let Some(num) = self.number {
+            let _ = write!(out, "<b>{}.</b> ", num);
+        }
+
+        let def = match self.definition_html.as_deref() {
+            Some(html) => sanitize_classic_html(html),
+            None => escape_html(self.definition_text.as_deref().unwrap_or("")),
+        };
+        let _ = writeln!(out, "{}", def.trim());
+
+        for ex in &self.examples {
+            let _ = writeln!(out, "▸ <i>{}</i>", escape_html(ex.text.trim()));
+        }
+
+        let fmt_relation = |r: &DleRelation| match r.homograph {
+            Some(n) => format!("{}{}", escape_html(&r.word), superscript(n)),
+            None => escape_html(&r.word),
+        };
+
+        let synonyms: Vec<String> = self
+            .relations
+            .iter()
+            .filter(|r| r.kind == "synonym")
+            .map(fmt_relation)
+            .collect();
+        if !synonyms.is_empty() {
+            let _ = writeln!(out, "<i>Sin.:</i> {}", synonyms.join(", "));
+        }
+
+        let antonyms: Vec<String> = self
+            .relations
+            .iter()
+            .filter(|r| r.kind == "antonym")
+            .map(fmt_relation)
+            .collect();
+        if !antonyms.is_empty() {
+            let _ = writeln!(out, "<i>Ant.:</i> {}", antonyms.join(", "));
+        }
+    }
+
     fn write_text(&self, out: &mut String) {
         if let Some(num) = self.number {
             let _ = write!(out, "{}. ", num);
@@ -420,7 +646,7 @@ impl DleSense {
         out.push('\n');
 
         for ex in &self.examples {
-            let _ = write!(out, "▸ {}\n", ex.text.trim());
+            let _ = writeln!(out, "▸ {}", ex.text.trim());
         }
 
         let fmt_text = |r: &DleRelation| match r.homograph {
@@ -435,7 +661,7 @@ impl DleSense {
             .map(fmt_text)
             .collect();
         if !synonyms.is_empty() {
-            let _ = write!(out, "Sin.: {}\n", synonyms.join(", "));
+            let _ = writeln!(out, "Sin.: {}", synonyms.join(", "));
         }
 
         let antonyms: Vec<String> = self
@@ -445,7 +671,7 @@ impl DleSense {
             .map(fmt_text)
             .collect();
         if !antonyms.is_empty() {
-            let _ = write!(out, "Ant.: {}\n", antonyms.join(", "));
+            let _ = writeln!(out, "Ant.: {}", antonyms.join(", "));
         }
     }
 }

@@ -49,7 +49,7 @@ pub async fn schedule_word_of_the_day(
     let mut initial_delay = target_moment - Local::now();
 
     if initial_delay < Duration::days(0) {
-        initial_delay = initial_delay + Duration::days(1);
+        initial_delay += Duration::days(1);
     }
 
     let initial_delay = StdDuration::from_secs(initial_delay.num_seconds().try_into().unwrap());

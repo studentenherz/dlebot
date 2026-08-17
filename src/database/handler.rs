@@ -9,6 +9,7 @@ use sea_orm::{
 };
 
 use crate::dle_ir::{DleEntry, DleExample, DleRelation, DleSense, DleSenseGroup, DleWord};
+use crate::settings::{MessageFormat, UserSettings};
 
 use super::schema::{event, lemmas, sea_orm_active_enums::EventType, user, word_of_the_day};
 
@@ -487,6 +488,42 @@ impl DatabaseHandler {
                 blocked: false,
                 in_bot: true,
                 admin: false,
+                rich_text: MessageFormat::default().is_rich(),
+            };
+            let new_user: user::ActiveModel = new_user.into();
+            if let Err(e) = new_user.insert(&self.db).await {
+                log::error!("DB error: {:?}", e);
+            }
+        }
+    }
+
+    /// Settings of `user_id`, or the defaults if they have no row yet.
+    pub async fn get_settings(&self, user_id: i64) -> UserSettings {
+        self.get_user(user_id)
+            .await
+            .map(|u| UserSettings {
+                format: MessageFormat::from_rich_text(u.rich_text),
+            })
+            .unwrap_or_default()
+    }
+
+    pub async fn set_message_format(&self, user_id: i64, format: MessageFormat) {
+        let rich_text = format.is_rich();
+
+        if let Some(user) = self.get_user(user_id).await {
+            let mut u: user::ActiveModel = user.into();
+            u.rich_text = Set(rich_text);
+            if let Err(e) = u.update(&self.db).await {
+                log::error!("DB error: {:?}", e);
+            }
+        } else {
+            let new_user = user::Model {
+                id: user_id,
+                subscribed: false,
+                blocked: false,
+                in_bot: true,
+                admin: false,
+                rich_text,
             };
             let new_user: user::ActiveModel = new_user.into();
             if let Err(e) = new_user.insert(&self.db).await {
