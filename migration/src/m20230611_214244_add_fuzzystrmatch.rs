@@ -12,7 +12,7 @@ impl MigrationTrait for Migration {
         let db_conn = manager.get_connection();
 
         db_conn
-            .execute(Statement::from_string(
+            .execute_raw(Statement::from_string(
                 DbBackend::Postgres,
                 r#"CREATE EXTENSION fuzzystrmatch"#.to_string(),
             ))
@@ -25,7 +25,7 @@ impl MigrationTrait for Migration {
         let db_conn = manager.get_connection();
 
         db_conn
-            .execute(Statement::from_string(
+            .execute_raw(Statement::from_string(
                 DbBackend::Postgres,
                 r#"DROP EXTENSION fuzzystrmatch"#.to_string(),
             ))
