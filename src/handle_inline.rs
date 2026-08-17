@@ -84,7 +84,7 @@ pub async fn handle_inline(
         }
     }
 
-    let mut req = bot.answer_inline_query_rich(q.id, results);
+    let mut req = bot.answer_inline_query_rich(q.id.to_string(), results);
     // Results depend on the user's settings, so they must not be cached for others.
     req.is_personal = Some(true);
     if req.results.is_empty() {

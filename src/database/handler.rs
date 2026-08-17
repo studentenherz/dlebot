@@ -18,6 +18,21 @@ pub struct DatabaseHandler {
     db: DatabaseConnection,
 }
 
+#[derive(Default)]
+struct EntryField {
+    headword: String,
+    homograph: Option<i16>,
+    etymology_text: Option<String>,
+    etymology_html: Option<String>,
+}
+
+#[derive(Default)]
+struct SenseField {
+    number: Option<i16>,
+    definition_text: Option<String>,
+    definition_html: Option<String>,
+}
+
 impl DatabaseHandler {
     pub async fn new(uri: String) -> Self {
         let mut opt = ConnectOptions::new(uri);
@@ -48,9 +63,9 @@ impl DatabaseHandler {
 
         let structural_rows = self
             .db
-            .query_all(Statement::from_sql_and_values(
+            .query_all_raw(Statement::from_sql_and_values(
                 DbBackend::Postgres,
-                &format!(
+                format!(
                     "SELECT \
                         e.lemma_id, \
                         e.id AS entry_id,     e.headword,          e.homograph, \
@@ -95,18 +110,18 @@ impl DatabaseHandler {
             let sv: Vec<Value> = sense_ids.iter().map(|&id| id.into()).collect();
 
             let (examples_res, relations_res) = tokio::join!(
-                self.db.query_all(Statement::from_sql_and_values(
+                self.db.query_all_raw(Statement::from_sql_and_values(
                     DbBackend::Postgres,
-                    &format!(
+                    format!(
                         "SELECT sense_id, text FROM examples \
                          WHERE sense_id IN ({sp}) \
                          ORDER BY sense_id, position"
                     ),
                     sv.clone(),
                 )),
-                self.db.query_all(Statement::from_sql_and_values(
+                self.db.query_all_raw(Statement::from_sql_and_values(
                     DbBackend::Postgres,
-                    &format!(
+                    format!(
                         "SELECT sense_id, kind, word, homograph, scope FROM relations \
                          WHERE sense_id IN ({sp}) \
                          ORDER BY sense_id, position"
@@ -149,15 +164,13 @@ impl DatabaseHandler {
         }
 
         let mut entry_ids_by_lemma: HashMap<i64, Vec<i64>> = HashMap::new();
-        let mut entry_fields: HashMap<i64, (String, Option<i16>, Option<String>, Option<String>)> =
-            HashMap::new();
+        let mut entry_fields: HashMap<i64, EntryField> = HashMap::new();
 
         let mut group_ids_by_entry: HashMap<i64, Vec<i64>> = HashMap::new();
         let mut group_fields: HashMap<i64, (String, Option<String>)> = HashMap::new();
 
         let mut sense_ids_by_group: HashMap<i64, Vec<i64>> = HashMap::new();
-        let mut sense_fields: HashMap<i64, (Option<i16>, Option<String>, Option<String>)> =
-            HashMap::new();
+        let mut sense_fields: HashMap<i64, SenseField> = HashMap::new();
 
         {
             let mut seen_entries: HashSet<i64> = HashSet::new();
@@ -176,12 +189,12 @@ impl DatabaseHandler {
                         .push(entry_id);
                     entry_fields.insert(
                         entry_id,
-                        (
-                            row.try_get("", "headword").unwrap_or_default(),
-                            row.try_get("", "homograph").unwrap_or(None),
-                            row.try_get("", "etymology_text").unwrap_or(None),
-                            row.try_get("", "etymology_html").unwrap_or(None),
-                        ),
+                        EntryField {
+                            headword: row.try_get("", "headword").unwrap_or_default(),
+                            homograph: row.try_get("", "homograph").unwrap_or(None),
+                            etymology_text: row.try_get("", "etymology_text").unwrap_or(None),
+                            etymology_html: row.try_get("", "etymology_html").unwrap_or(None),
+                        },
                     );
                 }
 
@@ -206,11 +219,11 @@ impl DatabaseHandler {
                         .push(sense_id);
                     sense_fields.insert(
                         sense_id,
-                        (
-                            row.try_get("", "sense_number").unwrap_or(None),
-                            row.try_get("", "definition_text").unwrap_or(None),
-                            row.try_get("", "definition_html").unwrap_or(None),
-                        ),
+                        SenseField {
+                            number: row.try_get("", "sense_number").unwrap_or(None),
+                            definition_text: row.try_get("", "definition_text").unwrap_or(None),
+                            definition_html: row.try_get("", "definition_html").unwrap_or(None),
+                        },
                     );
                 }
             }
@@ -224,8 +237,12 @@ impl DatabaseHandler {
                     .unwrap_or_default()
                     .into_iter()
                     .map(|entry_id| {
-                        let (headword, homograph, etymology_text, etymology_html) =
-                            entry_fields.remove(&entry_id).unwrap_or_default();
+                        let EntryField {
+                            headword,
+                            homograph,
+                            etymology_text,
+                            etymology_html,
+                        } = entry_fields.remove(&entry_id).unwrap_or_default();
                         let sense_groups = group_ids_by_entry
                             .remove(&entry_id)
                             .unwrap_or_default()
@@ -238,8 +255,11 @@ impl DatabaseHandler {
                                     .unwrap_or_default()
                                     .into_iter()
                                     .map(|sense_id| {
-                                        let (number, definition_text, definition_html) =
-                                            sense_fields.remove(&sense_id).unwrap_or_default();
+                                        let SenseField {
+                                            number,
+                                            definition_text,
+                                            definition_html,
+                                        } = sense_fields.remove(&sense_id).unwrap_or_default();
                                         DleSense {
                                             number,
                                             definition_text,
@@ -441,24 +461,6 @@ impl DatabaseHandler {
             .unwrap_or_default()
     }
 
-    pub async fn _get_subscribed_and_in_bot_list(&self) -> Vec<i64> {
-        super::schema::prelude::User::find()
-            .filter(
-                user::Column::Subscribed
-                    .eq(true)
-                    .and(user::Column::InBot.eq(true)),
-            )
-            .all(&self.db)
-            .await
-            .unwrap_or_else(|e| {
-                log::error!("DB error: {:?}", e);
-                vec![]
-            })
-            .iter()
-            .map(|m| m.id)
-            .collect()
-    }
-
     pub async fn get_in_bot_list(&self) -> Vec<i64> {
         super::schema::prelude::User::find()
             .filter(user::Column::InBot.eq(true))
@@ -471,30 +473,6 @@ impl DatabaseHandler {
             .iter()
             .map(|m| m.id)
             .collect()
-    }
-
-    pub async fn set_subscribed(&self, user_id: i64, subscribed: bool) {
-        if let Some(user) = self.get_user(user_id).await {
-            let mut u: user::ActiveModel = user.into();
-            u.subscribed = Set(subscribed);
-            u.in_bot = Set(true);
-            if let Err(e) = u.update(&self.db).await {
-                log::error!("DB error: {:?}", e);
-            }
-        } else {
-            let new_user = user::Model {
-                id: user_id,
-                subscribed,
-                blocked: false,
-                in_bot: true,
-                admin: false,
-                rich_text: MessageFormat::default().is_rich(),
-            };
-            let new_user: user::ActiveModel = new_user.into();
-            if let Err(e) = new_user.insert(&self.db).await {
-                log::error!("DB error: {:?}", e);
-            }
-        }
     }
 
     /// Settings of `user_id`, or the defaults if they have no row yet.

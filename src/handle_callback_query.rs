@@ -112,8 +112,8 @@ pub async fn handle_callback_query(
             .await?;
         }
         _ => {
-            bot.answer_callback_query(&query.id).await?;
             log::warn!("Unrecognized callback query: {:?}", query);
+            bot.answer_callback_query(query.id).await?;
         }
     }
 

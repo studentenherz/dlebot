@@ -10,25 +10,25 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-teloxide = { version = "0.13", features = [
+teloxide = { version = "0.17", features = [
     "macros",
     "webhooks",
     "webhooks-axum",
 ] }
 log = "0.4"
-pretty_env_logger = "0.4"
-tokio = { version = "1.8", features = ["rt-multi-thread", "macros"] }
+pretty_env_logger = "0.5"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros"] }
 dotenvy = "0.15.7"
-sea-orm = { version = "0.11.3", features = [
+sea-orm = { version = "2.0.2", features = [
     "sqlx-postgres",
     "runtime-tokio-rustls",
 ] }
-reqwest = "0.11.18"
+reqwest = "0.13.4"
 chrono = "0.4.26"
-base64 = "0.21.2"
-usvg = "0.35.0"
-resvg = "0.35.0"
-rand = "0.8.5"
-png = "0.17.9"
-regex = "1.9.1"
+base64 = "0.23.1"
+usvg = "0.48.1"
+resvg = "0.48.0"
+rand = {version ="0.10.2", features=["thread_rng"]}
+png = "0.18.1"
+regex = "1.13.1"
 serde = "1.0.228"

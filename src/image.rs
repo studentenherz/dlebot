@@ -1,11 +1,11 @@
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use ::teloxide::{prelude::*, types::InputFile};
 use chrono::{offset::Local, Datelike};
-use rand::Rng;
+use rand::{random_bool, random_range};
 use regex::Regex;
 use teloxide::types::ParseMode;
-use usvg::{fontdb, TreeParsing, TreeTextToPath};
+use usvg::fontdb;
 
 use crate::{
     dle_ir::{sanitize_html, DleWord},
@@ -28,10 +28,8 @@ const FONT_SIZE_NORMAL: f64 = 5.0 * FONT_SCALE;
 const FONT_SIZE_BIG: f64 = 20.0 * FONT_SCALE;
 
 fn get_image(lemma: &str, etymology: &str, channel: &str) -> Result<Vec<u8>, png::EncodingError> {
-    let mut rng = rand::thread_rng();
-
-    let bg_index = rng.gen_range(0..BG_COLORS_LENGTH);
-    let dark_theme = rng.gen_bool(0.5);
+    let bg_index = random_range(0..BG_COLORS_LENGTH);
+    let dark_theme = random_bool(0.5);
 
     let bg_color = if dark_theme {
         DARK_BG_COLORS[bg_index]
@@ -59,24 +57,23 @@ fn get_image(lemma: &str, etymology: &str, channel: &str) -> Result<Vec<u8>, png
     );
 
     let tree = {
+        let mut font_db = fontdb::Database::new();
+        font_db.load_fonts_dir(Path::new("fonts"));
+
         let opt = usvg::Options {
+            fontdb: Arc::new(font_db),
             font_family: "Tinos".to_string(),
             ..Default::default()
         };
 
-        let mut font_db = fontdb::Database::new();
-        font_db.load_fonts_dir(Path::new("fonts"));
-
-        let mut tree = usvg::Tree::from_str(&svg_str, &opt).unwrap();
-        tree.convert_text(&font_db);
-        resvg::Tree::from_usvg(&tree)
+        usvg::Tree::from_str(&svg_str, &opt).unwrap()
     };
 
-    let pixmap_size = tree.size.to_int_size();
+    let pixmap_size = tree.size().to_int_size();
     let mut pixmap =
         resvg::tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()).unwrap();
 
-    tree.render(usvg::Transform::default(), &mut pixmap.as_mut());
+    resvg::render(&tree, usvg::Transform::default(), &mut pixmap.as_mut());
 
     pixmap.encode_png()
 }

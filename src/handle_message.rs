@@ -18,10 +18,7 @@ use crate::{
     settings::{
         send_format_demo, send_settings, MessageFormat, UserSettings, START_DEMO, START_SETTINGS,
     },
-    utils::{
-        base64_decode, deep_link, smart_split, DISABLED_LINK_PREVIEW,
-        MAX_MASSAGE_LENGTH,
-    },
+    utils::{base64_decode, deep_link, smart_split, DISABLED_LINK_PREVIEW, MAX_MASSAGE_LENGTH},
     DLEBot,
 };
 
@@ -38,8 +35,6 @@ enum Command {
     Aleatorio,
     #[command(description = "Configurar el bot")]
     Ajustes,
-    // #[command(description = "Mostrar la «Palabra del día»")]
-    // Pdd,
 }
 
 fn split_by_first_whitespace(text: String) -> Result<(String, String), ParseError> {
@@ -77,7 +72,6 @@ pub async fn set_commands(bot: DLEBot) -> ResponseResult<()> {
 }
 
 const KEY_RANDOM: &str = "🎲 Palabra aleatoria";
-// const KEY_WOTD: &str = "📖 Palabra del día";
 const KEY_HELP: &str = "❔ Ayuda";
 const KEY_SETTINGS: &str = "⚙️ Ajustes";
 
@@ -86,9 +80,7 @@ async fn send_start(bot: DLEBot, msg: Message) -> ResponseResult<()> {
         KeyboardButton::new(KEY_RANDOM),
         KeyboardButton::new(KEY_HELP),
         KeyboardButton::new(KEY_SETTINGS),
-        // KeyboardButton::new(KEY_WOTD),
     ]])
-    // .append_row([KeyboardButton::new(KEY_HELP)])
     .resize_keyboard();
 
     bot.send_message(msg.chat.id, include_str!("templates/start.txt"))
@@ -132,22 +124,6 @@ async fn send_random(
     }
     Ok(())
 }
-
-// async fn send_word_of_the_day(
-//     db_handler: DatabaseHandler,
-//     bot: DLEBot,
-//     msg: Message,
-// ) -> ResponseResult<()> {
-//     if let Ok(wotd) = db_handler.get_word_of_the_day().await {
-//         bot.send_message(
-//             msg.chat.id,
-//             format!("📖 Palabra del día\n\n {}", wotd.to_html(None).trim()),
-//         )
-//         .link_preview_options(DISABLED_LINK_PREVIEW)
-//         .await?;
-//     }
-//     Ok(())
-// }
 
 /// Send `word` in the format the user chose in their settings, optionally
 /// prefixed with a line of text and replying to a message.
@@ -460,9 +436,6 @@ pub async fn handle_message(
                                     )
                                     .await?;
                                 }
-                                // KEY_WOTD => {
-                                //     send_word_of_the_day(db_handler, bot, msg).await?;
-                                // }
                                 _ => {
                                     send_message(db_handler, bot, msg, user_id, text, me, settings)
                                         .await?;
